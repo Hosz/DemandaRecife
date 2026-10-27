@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-ink: #121212;
+  --color-muted: #bcbcbc;
+  --color-acid: #d6ff00;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html {
+    background: #121212;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    min-width: 320px;
+    background: #121212;
+    color: #ffffff;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 2px solid #d6ff00;
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .panel {
+    @apply rounded-3xl border border-white/10 bg-white/[0.035] p-5 sm:p-6;
+  }
+
+  .eyebrow {
+    @apply mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-acid;
+  }
+
+  .section-title {
+    @apply font-display text-xl font-semibold tracking-tight;
+  }
+
+  .field-label {
+    @apply mb-2 block text-xs font-semibold text-muted;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white transition placeholder:text-muted focus:border-acid;
+  }
+
+  .field option {
+    @apply bg-ink text-white;
+  }
+
+  .primary-button {
+    @apply flex w-full items-center justify-center gap-2 rounded-xl bg-acid px-4 py-3 text-sm font-bold text-ink transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50;
+  }
 }
