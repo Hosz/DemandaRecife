@@ -10,16 +10,14 @@ export type Product = {
 export type SaleFormData = {
   productId: number;
   quantity: number;
-  soldAt: string; // data e hora em formato ISO
+  soldAt: string; 
 };
 
 type SaleFormProps = {
   products: Product[];
-  // retorna true se o envio deu certo (aí o formulário é limpo)
   onSubmit: (data: SaleFormData) => Promise<boolean>;
 };
 
-// o input datetime-local espera "AAAA-MM-DDTHH:mm" no horário local
 function getNowLocalInput() {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());

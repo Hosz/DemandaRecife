@@ -8,15 +8,32 @@ export type ApiResult = {
 export type SalePayload = {
   productId: string;
   quantity: number;
-  soldAt: string;
+  soldAt: string; 
 };
 
-// tenta ler uma mensagem de erro enviada pelo servidor ({ message } ou { error })
+type ImportResponse = {
+  totalLinhas?: number;
+  importadas?: number;
+  erros?: { linha: number; motivo: string }[];
+};
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function toLocalDateTime(isoString: string) {
+  const date = new Date(isoString);
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return `${day}T${time}`;
+}
 async function readErrorMessage(response: Response): Promise<string | null> {
   try {
     const body = await response.json();
-    if (typeof body?.message === "string") return body.message;
-    if (typeof body?.error === "string") return body.error;
+    for (const key of ["erro", "message", "detail"]) {
+      const value = body?.[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
     return null;
   } catch {
     return null;
@@ -26,18 +43,28 @@ async function readErrorMessage(response: Response): Promise<string | null> {
 async function request(
   path: string,
   init: RequestInit,
-  successMessage: string,
+  onSuccess: (response: Response) => Promise<ApiResult>,
   fallbackError: string,
 ): Promise<ApiResult> {
   try {
     const response = await fetch(`${API_URL}${path}`, init);
 
     if (response.ok) {
-      return { ok: true, message: successMessage };
+      return await onSuccess(response);
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      return {
+        ok: false,
+        message: "A API recusou o acesso. Verifique o login e tente novamente.",
+      };
     }
 
     if (response.status === 413) {
-      return { ok: false, message: "O arquivo é maior do que o servidor aceita." };
+      return {
+        ok: false,
+        message: "O arquivo é maior do que o servidor aceita.",
+      };
     }
 
     const apiMessage = await readErrorMessage(response);
@@ -50,28 +77,71 @@ async function request(
   }
 }
 
+async function describeImport(response: Response): Promise<ApiResult> {
+  let result: ImportResponse;
+
+  try {
+    result = await response.json();
+  } catch {
+    return { ok: true, message: "Arquivo enviado com sucesso." };
+  }
+
+  const { totalLinhas, importadas, erros = [] } = result;
+
+  if (typeof importadas !== "number" || typeof totalLinhas !== "number") {
+    return { ok: true, message: "Arquivo enviado com sucesso." };
+  }
+
+  const firstError = erros[0];
+
+  if (importadas === 0) {
+    return {
+      ok: false,
+      message: firstError
+        ? `Nenhuma linha importada. Linha ${firstError.linha}: ${firstError.motivo}`
+        : "Nenhuma linha foi importada.",
+    };
+  }
+
+  if (erros.length === 0) {
+    return {
+      ok: true,
+      message: `${importadas} de ${totalLinhas} linhas importadas com sucesso.`,
+    };
+  }
+
+  return {
+    ok: true,
+    message: `${importadas} de ${totalLinhas} linhas importadas. ${erros.length} com erro (linha ${firstError.linha}: ${firstError.motivo}).`,
+  };
+}
+
 export function createSale(sale: SalePayload): Promise<ApiResult> {
   return request(
     "/api/sales",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sale),
+      body: JSON.stringify({
+        productId: sale.productId,
+        quantidade: sale.quantity,
+        dataHoraVenda: toLocalDateTime(sale.soldAt),
+
+      }),
     },
-    "Venda registrada com sucesso.",
-    "Não foi possível registrar a venda. Tente novamente.",
+    async () => ({ ok: true, message: "Venda registrada com sucesso." }),
+    "Não foi possível registrar a venda. Confira os dados e tente novamente.",
   );
 }
 
 export function uploadSalesFile(file: File): Promise<ApiResult> {
   const formData = new FormData();
-  formData.append("file", file); // nome do campo que o back precisa esperar
+  formData.append("file", file);
 
-  // não define Content-Type aqui: o navegador coloca o correto com o boundary
   return request(
     "/api/sales/upload",
     { method: "POST", body: formData },
-    "Arquivo enviado com sucesso.",
+    describeImport,
     "Não foi possível enviar o arquivo. Tente novamente.",
   );
 }

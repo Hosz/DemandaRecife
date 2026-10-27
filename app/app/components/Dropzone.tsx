@@ -71,7 +71,6 @@ export function Dropzone({
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
     handleFiles(event.target.files);
-    // permite escolher o mesmo arquivo de novo depois de remover
     event.target.value = "";
   }
 
@@ -81,7 +80,6 @@ export function Dropzone({
   }
 
   function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
-    // ignora o "leave" que acontece ao passar por cima de elementos filhos
     if (event.currentTarget.contains(event.relatedTarget as Node)) return;
     setIsDragging(false);
   }
