@@ -47,8 +47,7 @@ export default function Home() {
           Central de dados
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-          Alimente o sistema por entrada manual, planilha ou integrações de
-          venda.
+          Alimente o protótipo por entrada manual, planilha, foto ou integrações de venda.
         </p>
       </header>
 
