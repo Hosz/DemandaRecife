@@ -1,22 +1,29 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 export type Product = {
-  id: number;
+  id: string;
   name: string;
 };
 
 export type SaleFormData = {
-  productId: number;
+  productId: string;
   quantity: number;
-  soldAt: string; 
+  soldAt: string;
 };
 
 type SaleFormProps = {
   products: Product[];
   onSubmit: (data: SaleFormData) => Promise<boolean>;
 };
+
+const BLOCKED_KEYS = ["e", "E", "+", "-", ".", ","];
 
 function getNowLocalInput() {
   const now = new Date();
@@ -27,8 +34,18 @@ function getNowLocalInput() {
 export function SaleForm({ products, onSubmit }: SaleFormProps) {
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [soldAt, setSoldAt] = useState(getNowLocalInput);
+  const [soldAt, setSoldAt] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    setSoldAt(getNowLocalInput());
+  }, []);
+
+  function handleQuantityKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (BLOCKED_KEYS.includes(event.key)) {
+      event.preventDefault();
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,7 +56,7 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
     let success = false;
     try {
       success = await onSubmit({
-        productId: Number(productId),
+        productId,
         quantity: Number(quantity),
         soldAt: new Date(soldAt).toISOString(),
       });
@@ -85,6 +102,7 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
           min={1}
           step={1}
           value={quantity}
+          onKeyDown={handleQuantityKeyDown}
           onChange={(event) => setQuantity(event.target.value)}
           disabled={isSending}
           required
@@ -100,7 +118,6 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
           onChange={(event) => setSoldAt(event.target.value)}
           disabled={isSending}
           required
-          suppressHydrationWarning
         />
       </label>
 
