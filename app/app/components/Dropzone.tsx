@@ -3,7 +3,7 @@
 import { useState, type ChangeEvent, type DragEvent } from "react";
 import { useToast } from "./ToastProvider";
 
-const ACCEPTED_EXTENSIONS = [".csv", ".xlsx"];
+const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".jpg", ".jpeg", ".png"];
 const DEFAULT_MAX_SIZE_MB = 10;
 
 type DropzoneProps = {
@@ -27,7 +27,7 @@ function validateFile(file: File, maxSizeMB: number): string | null {
   );
 
   if (!hasValidExtension) {
-    return "Formato não aceito. Envie um arquivo .csv ou .xlsx.";
+    return "Formato não aceito. Envie um arquivo .csv, .xlsx, .jpg ou .png.";
   }
 
   if (file.size === 0) {
@@ -133,7 +133,7 @@ export function Dropzone({
           Selecione ou arraste um arquivo
         </span>
         <span className="mt-2 text-xs text-muted">
-          CSV ou Excel (.csv, .xlsx) · até {maxSizeMB} MB
+          Excel, CSV, JPG ou PNG · até {maxSizeMB} MB
         </span>
       </label>
 
