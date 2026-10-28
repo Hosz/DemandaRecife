@@ -2,6 +2,7 @@ package com.uninassau.demandarecife.sales;
 
 import com.uninassau.demandarecife.sales.dto.ImportResult;
 import com.uninassau.demandarecife.sales.dto.SaleRequest;
+import com.uninassau.demandarecife.sales.dto.SaleResponse;
 import com.uninassau.demandarecife.shared.tenant.CurrentTenant;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +21,9 @@ public class SalesController {
     private final CurrentTenant currentTenant; // a definir
 
     @PostMapping
-    public ResponseEntity<SaleTransaction> create(@Valid @RequestBody SaleRequest req) {
+    public ResponseEntity<SaleResponse> create(@Valid @RequestBody SaleRequest req) {
         var saved = salesService.create(currentTenant.id(), req);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        return ResponseEntity.status(HttpStatus.CREATED).body(SaleResponse.from(saved));
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
