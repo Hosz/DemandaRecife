@@ -170,11 +170,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled
               aria-label="Notificações"
-              className={headerButtonClass}
+              title="Em breve"
+              className="relative grid size-10 cursor-not-allowed place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white opacity-40"
             >
               {bellIcon}
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-acid" />
             </button>
 
             <button
