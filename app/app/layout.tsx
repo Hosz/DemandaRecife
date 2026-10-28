@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
-import { BottomNav } from "./components/BottomNav";
+import { AppShell } from "./components/AppShell";
 import { ToastProvider } from "./components/ToastProvider";
 import "./globals.css";
 
@@ -33,8 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <ToastProvider>
-          {children}
-          <BottomNav />
+          <AppShell>{children}</AppShell>
         </ToastProvider>
       </body>
     </html>
