@@ -15,7 +15,9 @@ export type Product = {
 export type SaleFormData = {
   productId: string;
   quantity: number;
+  totalValue: number;
   soldAt: string;
+  channel: string;
 };
 
 type SaleFormProps = {
@@ -24,6 +26,8 @@ type SaleFormProps = {
 };
 
 const BLOCKED_KEYS = ["e", "E", "+", "-", ".", ","];
+const CHANNELS = ["Balcão", "Delivery", "WhatsApp"];
+const VALUE_PATTERN = "(?!0+(?:[.,]0{1,2})?$)[0-9]+(?:[.,][0-9]{1,2})?";
 
 function getNowLocalInput() {
   const now = new Date();
@@ -34,7 +38,9 @@ function getNowLocalInput() {
 export function SaleForm({ products, onSubmit }: SaleFormProps) {
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [totalValue, setTotalValue] = useState("");
   const [soldAt, setSoldAt] = useState("");
+  const [channel, setChannel] = useState(CHANNELS[0]);
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
@@ -58,7 +64,9 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
       success = await onSubmit({
         productId,
         quantity: Number(quantity),
+        totalValue: Number(totalValue.replace(",", ".")),
         soldAt: new Date(soldAt).toISOString(),
+        channel,
       });
     } finally {
       setIsSending(false);
@@ -67,14 +75,16 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
     if (success) {
       setProductId("");
       setQuantity("1");
+      setTotalValue("");
       setSoldAt(getNowLocalInput());
+      setChannel(CHANNELS[0]);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <label className="block">
-        <span className="field-label">Produto</span>
+    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+      <label className="block sm:col-span-2">
+        <span className="field-label">Produto ou serviço</span>
         <select
           className="field text-base"
           value={productId}
@@ -110,6 +120,24 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
       </label>
 
       <label className="block">
+        <span className="field-label">Valor total</span>
+        <input
+          className="field text-base"
+          type="text"
+          inputMode="decimal"
+          placeholder="0,00"
+          pattern={VALUE_PATTERN}
+          title="Informe um valor maior que zero, como 16,00"
+          value={totalValue}
+          onChange={(event) =>
+            setTotalValue(event.target.value.replace(/[^\d.,]/g, ""))
+          }
+          disabled={isSending}
+          required
+        />
+      </label>
+
+      <label className="block">
         <span className="field-label">Data e hora</span>
         <input
           className="field text-base [color-scheme:dark]"
@@ -121,7 +149,27 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
         />
       </label>
 
-      <button className="primary-button" type="submit" disabled={isSending}>
+      <label className="block">
+        <span className="field-label">Canal</span>
+        <select
+          className="field text-base"
+          value={channel}
+          onChange={(event) => setChannel(event.target.value)}
+          disabled={isSending}
+        >
+          {CHANNELS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <button
+        className="primary-button sm:col-span-2"
+        type="submit"
+        disabled={isSending}
+      >
         {isSending ? "Registrando..." : "Registrar venda"}
       </button>
     </form>

@@ -40,32 +40,22 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
+    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
       <header className="mb-6 sm:mb-8">
-        <p className="eyebrow">DemandaFácil Recife</p>
+        <p className="eyebrow">Ingestão multicanal</p>
         <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-          Lançar vendas
+          Central de dados
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-          Registre uma venda avulsa em poucos segundos ou importe o histórico de
-          vendas de uma planilha.
+          Alimente o sistema por entrada manual, planilha ou integrações de
+          venda.
         </p>
       </header>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2 lg:gap-6">
+      <div className="grid items-start gap-4 xl:grid-cols-2 xl:gap-6">
         <section className="panel">
-          <p className="eyebrow">Venda avulsa</p>
-          <h2 className="section-title mb-5">Registrar venda</h2>
-
-          <SaleForm products={MOCK_PRODUCTS} onSubmit={handleSaleSubmit} />
-        </section>
-
-        <section className="panel">
-          <p className="eyebrow">Histórico</p>
-          <h2 className="section-title">Importar arquivo</h2>
-          <p className="mt-1 text-xs leading-5 text-muted">
-            Envie uma planilha com as vendas passadas.
-          </p>
+          <p className="eyebrow">Upload inteligente</p>
+          <h2 className="section-title">Importar arquivo ou foto</h2>
 
           <div className="mt-5">
             <Dropzone
@@ -83,6 +73,13 @@ export default function Home() {
           >
             {isUploading ? "Enviando..." : "Enviar arquivo"}
           </button>
+        </section>
+
+        <section className="panel">
+          <p className="eyebrow">Entrada manual</p>
+          <h2 className="section-title mb-5">Registrar movimento</h2>
+
+          <SaleForm products={MOCK_PRODUCTS} onSubmit={handleSaleSubmit} />
         </section>
       </div>
     </main>

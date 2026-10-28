@@ -8,7 +8,9 @@ export type ApiResult = {
 export type SalePayload = {
   productId: string;
   quantity: number;
-  soldAt: string; 
+  totalValue: number;
+  soldAt: string;
+  channel: string;
 };
 
 type ImportResponse = {
@@ -27,6 +29,7 @@ function toLocalDateTime(isoString: string) {
   const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   return `${day}T${time}`;
 }
+
 async function readErrorMessage(response: Response): Promise<string | null> {
   try {
     const body = await response.json();
@@ -117,6 +120,8 @@ async function describeImport(response: Response): Promise<ApiResult> {
 }
 
 export function createSale(sale: SalePayload): Promise<ApiResult> {
+  const unitPrice = Math.round((sale.totalValue / sale.quantity) * 100) / 100;
+
   return request(
     "/api/sales",
     {
@@ -125,8 +130,9 @@ export function createSale(sale: SalePayload): Promise<ApiResult> {
       body: JSON.stringify({
         productId: sale.productId,
         quantidade: sale.quantity,
+        precoUnitario: unitPrice,
         dataHoraVenda: toLocalDateTime(sale.soldAt),
-
+        canal: sale.channel,
       }),
     },
     async () => ({ ok: true, message: "Venda registrada com sucesso." }),
