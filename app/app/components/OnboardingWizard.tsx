@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface OnboardingWizardProps {
   onSubmit: (data: {
+    userName: string;
     niche: string;
     businessDays: string[];
     openingTime: string;
@@ -33,9 +35,11 @@ const DAYS_OF_WEEK = [
 ];
 
 export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
+  const router = useRouter();
   const [step, setStep] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const [userName, setUserName] = useState<string>("");
   const [niche, setNiche] = useState<string>(NICHES[0]);
   const [businessDays, setBusinessDays] = useState<string[]>(["SEG", "TER", "QUA", "QUI", "SEX"]);
   const [openingTime, setOpeningTime] = useState<string>("08:00");
@@ -50,7 +54,8 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
 
   async function handleFinish() {
     setLoading(true);
-    await onSubmit({
+    const success = await onSubmit({
+      userName,
       niche,
       businessDays,
       openingTime,
@@ -58,11 +63,15 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
       averageTicket: Number(averageTicket) || 0,
     });
     setLoading(false);
+
+    if (userName) {
+      localStorage.setItem("user_name", userName);
+    }
+    router.push("/");
   }
 
   return (
     <div className="panel max-w-xl mx-auto space-y-6">
-      {/* Indicador de Passos */}
       <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
         {[1, 2, 3].map((i) => (
           <div key={i} className="flex items-center gap-2">
@@ -78,40 +87,53 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
               {i}
             </div>
             <span className="text-xs text-zinc-400 hidden sm:inline">
-              {i === 1 ? "Nicho" : i === 2 ? "Horários" : "Ticket Médio"}
+              {i === 1 ? "Perfil e Nicho" : i === 2 ? "Horários" : "Ticket Médio"}
             </span>
           </div>
         ))}
       </div>
 
-      {/* PASSO 1: NICHO DE ATUAÇÃO */}
       {step === 1 && (
         <div className="space-y-4">
           <div>
             <p className="eyebrow">Passo 1 de 3</p>
-            <h2 className="section-title">Qual é o seu nicho de atuação?</h2>
+            <h2 className="section-title">Como podemos te chamar e qual o seu nicho?</h2>
             <p className="text-xs text-zinc-400 mt-1">
-              Esta informação é essencial para calibrar as previsões iniciais (Cold Start).
+              Informações básicas para personalizar seu acesso e calibrar as previsões.
             </p>
           </div>
 
-          <div className="space-y-2 pt-2">
-            <label className="text-xs text-zinc-400 font-medium">Selecione o segmento</label>
-            <select
-              value={niche}
-              onChange={(e) => setNiche(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
-            >
-              {NICHES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400 font-medium">Seu nome</label>
+              <input
+                type="text"
+                placeholder="Ex: Marina"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400 font-medium">Segmento do negócio</label>
+              <select
+                value={niche}
+                onChange={(e) => setNiche(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
+              >
+                {NICHES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <button
             type="button"
+            disabled={!userName.trim()}
             onClick={() => setStep(2)}
             className="primary-button w-full mt-4"
           >
@@ -120,7 +142,6 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
         </div>
       )}
 
-      {/* PASSO 2: HORÁRIOS E DIAS */}
       {step === 2 && (
         <div className="space-y-4">
           <div>
@@ -194,7 +215,6 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
         </div>
       )}
 
-      {/* PASSO 3: TICKET MÉDIO */}
       {step === 3 && (
         <div className="space-y-4">
           <div>
