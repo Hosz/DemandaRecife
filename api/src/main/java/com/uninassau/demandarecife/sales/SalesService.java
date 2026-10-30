@@ -147,7 +147,8 @@ public class SalesService {
         try {
             return new BigDecimal(t);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(campo + " inválido: " + s);
+            String genero = "Quantidade".equalsIgnoreCase(campo) ? "inválida" : "inválido";
+            throw new IllegalArgumentException(campo + " " + genero + ": " + s);
         }
     }
 
