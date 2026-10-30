@@ -1,8 +1,7 @@
-package com.uninassau.demandarecife.external.weather;
+package com.uninassau.demandarecife.external.support;
 
-import com.uninassau.demandarecife.external.weather.dto.OpenWeatherForecastResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -10,10 +9,9 @@ import org.springframework.web.client.RestClient;
 
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class OpenWeatherClient {
-
-    private static final Logger log = LoggerFactory.getLogger(OpenWeatherClient.class);
 
     private final RestClient restClient;
     private final String apiKey;
@@ -46,9 +44,8 @@ public class OpenWeatherClient {
                             .queryParam("appid", apiKey)
                             .build())
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (req, resp) -> {
-                        log.error("Erro na API OpenWeather: status={} cidade={}", resp.getStatusCode(), cidade);
-                    })
+                    .onStatus(HttpStatusCode::isError, (req, resp) ->
+                            log.error("Erro na API OpenWeather: status={} cidade={}", resp.getStatusCode(), cidade))
                     .body(OpenWeatherForecastResponse.class);
 
             return Optional.ofNullable(response);

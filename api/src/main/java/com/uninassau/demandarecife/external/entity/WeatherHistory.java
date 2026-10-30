@@ -1,22 +1,34 @@
-package com.uninassau.demandarecife.external.weather;
+package com.uninassau.demandarecife.external.entity;
 
-import jakarta.persistence.*;
-import lombok.Getter;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(of = "id")
 @Entity
 @Table(name = "weather_history", uniqueConstraints = {
         @UniqueConstraint(name = "uq_weather_cidade_data", columnNames = {"cidade", "data_clima"})
 })
-@Getter
-@Setter
-@NoArgsConstructor
 public class WeatherHistory {
 
     @Id
@@ -39,20 +51,21 @@ public class WeatherHistory {
     private BigDecimal tempMinima;
 
     @Column(length = 50)
-    private String condicao; // Rain, Clouds, Clear, etc.
+    private String condicao;
 
     @Column(name = "precipitacao_mm", precision = 5, scale = 2)
     private BigDecimal precipitacaoMm;
 
     @Column(nullable = false, length = 20)
-    private String status = "PREVISAO"; // PREVISAO ou CONSOLIDADO
+    @Builder.Default
+    private String status = "PREVISAO";
 
     @Column(name = "atualizado_em")
-    private LocalDateTime atualizadoEm;
+    private Instant atualizadoEm;
 
     @PrePersist
     @PreUpdate
     public void prePersist() {
-        this.atualizadoEm = LocalDateTime.now();
+        this.atualizadoEm = Instant.now();
     }
 }

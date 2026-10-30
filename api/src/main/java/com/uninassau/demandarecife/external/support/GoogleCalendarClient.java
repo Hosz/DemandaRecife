@@ -1,8 +1,7 @@
-package com.uninassau.demandarecife.external.holidays;
+package com.uninassau.demandarecife.external.support;
 
-import com.uninassau.demandarecife.external.holidays.dto.GoogleCalendarEventsResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.uninassau.demandarecife.external.dto.GoogleCalendarEventsResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -13,10 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class GoogleCalendarClient {
-
-    private static final Logger log = LoggerFactory.getLogger(GoogleCalendarClient.class);
 
     private final RestClient restClient;
     private final String apiKey;
@@ -51,9 +49,8 @@ public class GoogleCalendarClient {
                             .queryParam("key", apiKey)
                             .build(encodedCalendarId))
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (req, resp) -> {
-                        log.error("Erro na API Google Calendar: status={} calendarId={}", resp.getStatusCode(), calendarId);
-                    })
+                    .onStatus(HttpStatusCode::isError, (req, resp) ->
+                            log.error("Erro na API Google Calendar: status={} calendarId={}", resp.getStatusCode(), calendarId))
                     .body(GoogleCalendarEventsResponse.class);
 
             return Optional.ofNullable(response);

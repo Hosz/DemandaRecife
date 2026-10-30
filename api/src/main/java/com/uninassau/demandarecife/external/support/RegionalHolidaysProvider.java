@@ -1,5 +1,6 @@
-package com.uninassau.demandarecife.external.holidays;
+package com.uninassau.demandarecife.external.support;
 
+import com.uninassau.demandarecife.external.entity.HolidayEvent;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -54,7 +55,13 @@ public class RegionalHolidaysProvider {
         for (RegionalHolidayDef def : catalog) {
             try {
                 LocalDate date = LocalDate.of(year, def.mes(), def.dia());
-                events.add(new HolidayEvent(date, def.nome(), def.tipo(), def.estado(), def.cidade()));
+                events.add(HolidayEvent.builder()
+                        .dataEvento(date)
+                        .nome(def.nome())
+                        .tipo(def.tipo())
+                        .estado(def.estado())
+                        .cidade(def.cidade())
+                        .build());
             } catch (Exception ignored) {
             }
         }

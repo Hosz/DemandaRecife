@@ -1,19 +1,28 @@
 package com.uninassau.demandarecife.tenants;
 
-import jakarta.persistence.*;
-import lombok.Getter;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(of = "id")
 @Entity
 @Table(name = "tenants")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Tenant {
 
     @Id
@@ -42,7 +51,7 @@ public class Tenant {
     private String bairro;
 
     @Column(name = "criado_em", insertable = false, updatable = false)
-    private LocalDateTime criadoEm;
+    private Instant criadoEm;
 
     public Tenant(String nome, String cidade, String estado) {
         this.nome = nome;

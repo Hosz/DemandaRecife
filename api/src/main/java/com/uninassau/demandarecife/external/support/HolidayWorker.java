@@ -1,36 +1,34 @@
-package com.uninassau.demandarecife.external.holidays;
+package com.uninassau.demandarecife.external.support;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.uninassau.demandarecife.external.service.HolidaySyncService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class HolidayWorker {
 
-    private static final Logger log = LoggerFactory.getLogger(HolidayWorker.class);
     private static final int MAX_RETRIES = 3;
 
     private final HolidaySyncService holidaySyncService;
 
-    public HolidayWorker(HolidaySyncService holidaySyncService) {
-        this.holidaySyncService = holidaySyncService;
-    }
-
-    @Scheduled(cron = "${app.holidays.cron:0 0 2 1 * ?}", zone = "America/Recife")
-    public void executeScheduledHolidaySync() {
-        log.info("Iniciando Worker agendado de sincronização de feriados (RF08)...");
-
+    @Scheduled(cron = "${app.holidays.cron:0 30 2 * * ?}", zone = "America/Recife")
+    public void executeDailyHolidaySync() {
         int currentYear = LocalDate.now().getYear();
+        log.info("Iniciando Worker diário de sincronização de feriados para o ano {} (RF08)...", currentYear);
+
         int attempt = 0;
         long backoffMs = 5000;
 
         while (attempt < MAX_RETRIES) {
             attempt++;
             try {
-                int totalProcessed = holidaySyncService.syncHolidays(currentYear, currentYear + 1);
+                int totalProcessed = holidaySyncService.syncHolidaysForYear(currentYear);
                 log.info("Worker de feriados concluído com sucesso. Total de novos feriados: {}", totalProcessed);
                 return;
             } catch (Exception ex) {

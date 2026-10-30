@@ -1,4 +1,4 @@
-package com.uninassau.demandarecife.external.holidays.dto;
+package com.uninassau.demandarecife.external.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

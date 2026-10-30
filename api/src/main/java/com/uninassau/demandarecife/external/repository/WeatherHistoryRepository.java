@@ -1,5 +1,6 @@
-package com.uninassau.demandarecife.external.weather;
+package com.uninassau.demandarecife.external.repository;
 
+import com.uninassau.demandarecife.external.entity.WeatherHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

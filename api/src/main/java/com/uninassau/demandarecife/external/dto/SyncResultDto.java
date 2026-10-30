@@ -1,4 +1,4 @@
-package com.uninassau.demandarecife.external.controller.dto;
+package com.uninassau.demandarecife.external.dto;
 
 public record SyncResultDto(
         String status,

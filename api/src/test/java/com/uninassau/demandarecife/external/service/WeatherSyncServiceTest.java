@@ -1,7 +1,17 @@
-package com.uninassau.demandarecife.external.weather;
+package com.uninassau.demandarecife.external.service;
 
-import com.uninassau.demandarecife.external.weather.dto.OpenWeatherForecastResponse;
-import com.uninassau.demandarecife.external.weather.dto.OpenWeatherForecastResponse.*;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse.CityInfo;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse.ForecastItem;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse.MainInfo;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse.RainInfo;
+import com.uninassau.demandarecife.external.dto.OpenWeatherForecastResponse.WeatherInfo;
+import com.uninassau.demandarecife.external.entity.WeatherHistory;
+import com.uninassau.demandarecife.external.repository.WeatherHistoryRepository;
+import com.uninassau.demandarecife.external.support.OpenWeatherClient;
+import com.uninassau.demandarecife.external.support.WeatherAggregatorSupport;
+import com.uninassau.demandarecife.external.support.WeatherProperties;
+import com.uninassau.demandarecife.external.validator.ExternalSyncValidator;
 import com.uninassau.demandarecife.tenants.TenantRepository;
 import com.uninassau.demandarecife.tenants.dto.LocationDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +28,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WeatherSyncServiceTest {
@@ -37,12 +47,17 @@ class WeatherSyncServiceTest {
 
     @BeforeEach
     void setUp() {
+        WeatherAggregatorSupport aggregatorSupport = new WeatherAggregatorSupport();
+        ExternalSyncValidator validator = new ExternalSyncValidator();
+        WeatherProperties properties = new WeatherProperties("Recife", "PE");
+
         weatherSyncService = new WeatherSyncService(
                 openWeatherClient,
                 weatherHistoryRepository,
                 tenantRepository,
-                "Recife",
-                "PE"
+                aggregatorSupport,
+                validator,
+                properties
         );
     }
 
@@ -60,10 +75,11 @@ class WeatherSyncServiceTest {
     @Test
     void syncWeatherForCity_consolidaPrevisaoDeOntem() {
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        WeatherHistory yesterdayRecord = new WeatherHistory();
-        yesterdayRecord.setCidade("Recife");
-        yesterdayRecord.setDataClima(yesterday);
-        yesterdayRecord.setStatus("PREVISAO");
+        WeatherHistory yesterdayRecord = WeatherHistory.builder()
+                .cidade("Recife")
+                .dataClima(yesterday)
+                .status("PREVISAO")
+                .build();
 
         when(weatherHistoryRepository.findByCidadeAndDataClima("Recife", yesterday))
                 .thenReturn(Optional.of(yesterdayRecord));

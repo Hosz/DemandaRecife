@@ -1,7 +1,7 @@
 package com.uninassau.demandarecife.external.controller;
 
-import com.uninassau.demandarecife.external.holidays.HolidaySyncService;
-import com.uninassau.demandarecife.external.weather.WeatherSyncService;
+import com.uninassau.demandarecife.external.service.HolidaySyncService;
+import com.uninassau.demandarecife.external.service.WeatherSyncService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;

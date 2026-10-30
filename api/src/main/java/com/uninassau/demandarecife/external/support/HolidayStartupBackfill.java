@@ -1,7 +1,8 @@
-package com.uninassau.demandarecife.external.holidays;
+package com.uninassau.demandarecife.external.support;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.uninassau.demandarecife.external.repository.HolidayEventRepository;
+import com.uninassau.demandarecife.external.service.HolidaySyncService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -9,10 +10,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
+@Slf4j
 @Component
 public class HolidayStartupBackfill implements ApplicationRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(HolidayStartupBackfill.class);
 
     private final HolidayEventRepository holidayRepository;
     private final HolidaySyncService holidaySyncService;

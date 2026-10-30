@@ -1,21 +1,19 @@
-package com.uninassau.demandarecife.external.weather;
+package com.uninassau.demandarecife.external.support;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.uninassau.demandarecife.external.service.WeatherSyncService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class WeatherWorker {
 
-    private static final Logger log = LoggerFactory.getLogger(WeatherWorker.class);
     private static final int MAX_RETRIES = 3;
 
     private final WeatherSyncService weatherSyncService;
-
-    public WeatherWorker(WeatherSyncService weatherSyncService) {
-        this.weatherSyncService = weatherSyncService;
-    }
 
     @Scheduled(cron = "${app.weather.cron:0 0 2 * * ?}", zone = "America/Recife")
     public void executeDailyWeatherSync() {
@@ -35,7 +33,7 @@ public class WeatherWorker {
                 if (attempt < MAX_RETRIES) {
                     try {
                         Thread.sleep(backoffMs);
-                        backoffMs *= 2; // Backoff exponencial
+                        backoffMs *= 2;
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.warn("Worker de clima interrompido durante o backoff.");
