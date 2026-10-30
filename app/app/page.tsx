@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { DashboardSkeleton } from "./components/DashboardSkeleton";
 import {
   EXAMPLE_BRIEFING,
@@ -12,6 +18,19 @@ import {
 const USE_EXAMPLE_DATA_ON_ERROR = true;
 
 type FlowPoint = NonNullable<DailyBriefingData["customerFlow"]>[number];
+
+function subscribeToStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function readUserName(): string | null | undefined {
+  return localStorage.getItem("user_name");
+}
+
+function readUserNameOnServer(): string | null | undefined {
+  return undefined;
+}
 
 function Icon({
   children,
@@ -229,46 +248,66 @@ function FlowChart({ points }: { points: FlowPoint[] }) {
 }
 
 export default function InicioPage() {
-  const [userName, setUserName] = useState<string | null>(null);
+  const router = useRouter();
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
   const [data, setData] = useState<DailyBriefingData | null>(null);
   const [loadedAt, setLoadedAt] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const result = await fetchDailyBriefing();
-
-    setLoadedAt(
-      new Date().toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    );
-
-    if (result) {
-      setData(result);
-      setStatus("ready");
-      return;
-    }
-
-    if (USE_EXAMPLE_DATA_ON_ERROR) {
-      setData(EXAMPLE_BRIEFING);
-      setStatus("ready");
-      return;
-    }
-
-    setStatus("error");
-  }, []);
+  const [attempt, setAttempt] = useState(0);
+  const userName = useSyncExternalStore(
+    subscribeToStorage,
+    readUserName,
+    readUserNameOnServer,
+  );
 
   useEffect(() => {
-    setUserName(localStorage.getItem("user_name"));
-    load();
-  }, [load]);
+    if (userName === undefined) return;
+
+    if (userName === null) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function run() {
+      const result = await fetchDailyBriefing();
+
+      if (cancelled) return;
+
+      setLoadedAt(
+        new Date().toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
+
+      if (result) {
+        setData(result);
+        setStatus("ready");
+        return;
+      }
+
+      if (USE_EXAMPLE_DATA_ON_ERROR) {
+        setData(EXAMPLE_BRIEFING);
+        setStatus("ready");
+        return;
+      }
+
+      setStatus("error");
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userName, attempt, router]);
 
   function handleRetry() {
     setStatus("loading");
-    load();
+    setAttempt((current) => current + 1);
   }
 
   const flow = data?.customerFlow ?? [];
@@ -387,7 +426,7 @@ export default function InicioPage() {
                       </button>
                       <button
                         type="button"
-                        className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semiboldtransition accent-button"
+                        className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semibold transition accent-button"
                       >
                         Corrigir
                       </button>
