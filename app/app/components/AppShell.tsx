@@ -151,6 +151,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen]);
 
+    useEffect(() => {
+    const noop = () => {};
+    document.addEventListener("touchstart", noop, { passive: true });
+    return () => document.removeEventListener("touchstart", noop);
+  }, []);
+
   const onMainTab = MAIN_TABS.some((tab) => isActive(pathname, tab.href));
   const maisActive = menuOpen || !onMainTab;
 

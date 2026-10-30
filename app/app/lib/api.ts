@@ -179,3 +179,34 @@ export async function submitOnboarding(data: OnboardingData) {
     return { ok: false, message: "Não foi possível conectar ao servidor." };
   }
 }
+
+export interface DailyBriefingData {
+  weather?: {
+    temp: string;
+    condition: string;
+    location: string;
+    date: string;
+  };
+  metrics?: {
+    salesForecast: string;
+    salesDiff: string;
+    peakHour: string;
+    peakRange: string;
+    stockAlertsCount: number;
+    modelAccuracy: string;
+    accuracyDiff: string;
+  };
+  customerFlow?: { hour: string; value: number; highlight?: boolean }[];
+  alerts?: { id: string; badge: string; title: string; description: string }[];
+  replenishment?: { id: string; product: string; actionTime: string; suggestedQty: string }[];
+}
+
+export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
+  try {
+    const response = await fetch("http://localhost:8080/api/dashboard/daily-briefing");
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+}

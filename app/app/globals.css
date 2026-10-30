@@ -62,3 +62,25 @@
     @apply flex w-full items-center justify-center gap-2 rounded-xl bg-acid px-4 py-3 text-sm font-bold text-ink transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50;
   }
 }
+
+.metric-card:hover,
+.metric-card:active {
+  border-color: rgb(214 255 0 / 0.4);
+}
+
+.metric-card:hover .metric-card-icon,
+.metric-card:active .metric-card-icon {
+  background-color: #d6ff00;
+  color: #121212;
+}
+
+.accent-button:hover,
+.accent-button:active {
+  border-color: #d6ff00;
+  color: #d6ff00;
+}
+
+.accent-link:hover,
+.accent-link:active {
+  text-decoration: underline;
+}
