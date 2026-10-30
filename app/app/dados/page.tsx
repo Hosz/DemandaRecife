@@ -5,6 +5,8 @@ import { Dropzone } from "../components/Dropzone";
 import { SaleForm, type SaleFormData } from "../components/SaleForm";
 import { useToast } from "../components/ToastProvider";
 import { createSale, uploadSalesFile } from "../lib/api";
+import { IntegrationsSection } from "../components/IntegrationsSection";
+import { ImportHistory } from "../components/ImportHistory";
 
 const MOCK_PRODUCTS = [
   { id: "1", name: "Leite integral" },
@@ -81,6 +83,10 @@ export default function DadosPage() {
 
           <SaleForm products={MOCK_PRODUCTS} onSubmit={handleSaleSubmit} />
         </section>
+
+        <IntegrationsSection />
+        
+        <ImportHistory />
       </div>
     </main>
   );
