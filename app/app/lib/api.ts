@@ -151,3 +151,31 @@ export function uploadSalesFile(file: File): Promise<ApiResult> {
     "Não foi possível enviar o arquivo. Tente novamente.",
   );
 }
+
+export interface OnboardingData {
+  niche: string;
+  businessDays: string[];
+  openingTime: string;
+  closingTime: string;
+  averageTicket: number;
+}
+
+export async function submitOnboarding(data: OnboardingData) {
+  try {
+    const response = await fetch("http://localhost:8080/api/auth/onboard", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      return { ok: false, message: "Erro ao guardar configurações iniciais." };
+    }
+
+    return { ok: true, message: "Onboarding concluído com sucesso!" };
+  } catch (error) {
+    return { ok: false, message: "Não foi possível conectar ao servidor." };
+  }
+}
