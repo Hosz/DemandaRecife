@@ -1,18 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import type { OnboardingData } from "../lib/api";
 
-interface OnboardingWizardProps {
-  onSubmit: (data: {
-    userName: string;
-    niche: string;
-    businessDays: string[];
-    openingTime: string;
-    closingTime: string;
-    averageTicket: number;
-  }) => Promise<boolean>;
-}
+const CONTINUE_WHEN_API_FAILS = true;
+
+type OnboardingWizardProps = {
+  onSubmit: (data: OnboardingData) => Promise<boolean>;
+};
 
 const NICHES = [
   "Padaria / Confeitaria",
@@ -34,108 +30,148 @@ const DAYS_OF_WEEK = [
   { id: "DOM", label: "Dom" },
 ];
 
+const STEPS = ["Perfil e nicho", "Horários", "Ticket médio"];
+const BLOCKED_KEYS = ["e", "E", "+", "-"];
+
+const secondaryButton =
+  "w-1/3 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-semibold transition accent-button";
+
 export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
   const router = useRouter();
-  const [step, setStep] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
 
-  const [userName, setUserName] = useState<string>("");
-  const [niche, setNiche] = useState<string>(NICHES[0]);
-  const [businessDays, setBusinessDays] = useState<string[]>(["SEG", "TER", "QUA", "QUI", "SEX"]);
-  const [openingTime, setOpeningTime] = useState<string>("08:00");
-  const [closingTime, setClosingTime] = useState<string>("18:00");
-  const [averageTicket, setAverageTicket] = useState<string>("");
+  const [userName, setUserName] = useState("");
+  const [niche, setNiche] = useState(NICHES[0]);
+  const [businessDays, setBusinessDays] = useState<string[]>([
+    "SEG",
+    "TER",
+    "QUA",
+    "QUI",
+    "SEX",
+  ]);
+  const [openingTime, setOpeningTime] = useState("08:00");
+  const [closingTime, setClosingTime] = useState("18:00");
+  const [averageTicket, setAverageTicket] = useState("");
+
+  const ticketValue = Number(averageTicket);
 
   function toggleDay(dayId: string) {
-    setBusinessDays((prev) =>
-      prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId]
+    setBusinessDays((previous) =>
+      previous.includes(dayId)
+        ? previous.filter((day) => day !== dayId)
+        : [...previous, dayId],
     );
   }
 
+  function handleTicketKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (BLOCKED_KEYS.includes(event.key)) {
+      event.preventDefault();
+    }
+  }
+
   async function handleFinish() {
+    if (loading) return;
+
     setLoading(true);
+    const name = userName.trim();
+
     const success = await onSubmit({
-      userName,
+      userName: name,
       niche,
       businessDays,
       openingTime,
       closingTime,
-      averageTicket: Number(averageTicket) || 0,
+      averageTicket: ticketValue,
     });
+
     setLoading(false);
 
-    if (userName) {
-      localStorage.setItem("user_name", userName);
+    if (success || CONTINUE_WHEN_API_FAILS) {
+      localStorage.setItem("user_name", name);
+      router.replace("/");
     }
-    router.push("/");
   }
 
   return (
-    <div className="panel max-w-xl mx-auto space-y-6">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                step === i
-                  ? "bg-lime-400 text-zinc-950"
-                  : step > i
-                  ? "bg-zinc-800 text-lime-400 border border-lime-400/30"
-                  : "bg-zinc-800 text-zinc-500"
-              }`}
+    <div className="panel mx-auto max-w-xl space-y-6">
+      <ol className="flex items-center justify-between border-b border-white/10 pb-4">
+        {STEPS.map((label, index) => {
+          const number = index + 1;
+          const current = step === number;
+          const done = step > number;
+
+          return (
+            <li
+              key={label}
+              aria-current={current ? "step" : undefined}
+              className="flex items-center gap-2"
             >
-              {i}
-            </div>
-            <span className="text-xs text-zinc-400 hidden sm:inline">
-              {i === 1 ? "Perfil e Nicho" : i === 2 ? "Horários" : "Ticket Médio"}
-            </span>
-          </div>
-        ))}
-      </div>
+              <span
+                className={`grid size-8 place-items-center rounded-full text-sm font-bold ${
+                  current
+                    ? "bg-acid text-ink"
+                    : done
+                      ? "border border-acid/30 bg-white/[0.06] text-acid"
+                      : "bg-white/[0.06] text-muted"
+                }`}
+              >
+                {number}
+              </span>
+              <span className="hidden text-xs text-muted sm:inline">
+                {label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
 
       {step === 1 && (
         <div className="space-y-4">
           <div>
             <p className="eyebrow">Passo 1 de 3</p>
-            <h2 className="section-title">Como podemos te chamar e qual o seu nicho?</h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Informações básicas para personalizar seu acesso e calibrar as previsões.
+            <h2 className="section-title">
+              Como podemos te chamar e qual o seu nicho?
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              Informações básicas para personalizar seu acesso e calibrar as
+              previsões.
             </p>
           </div>
 
-          <div className="space-y-4 pt-2">
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Seu nome</label>
-              <input
-                type="text"
-                placeholder="Ex: Marina"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
-              />
-            </div>
+          <label className="block">
+            <span className="field-label">Seu nome</span>
+            <input
+              className="field text-base"
+              type="text"
+              placeholder="Ex: Marina"
+              autoComplete="given-name"
+              maxLength={100}
+              value={userName}
+              onChange={(event) => setUserName(event.target.value)}
+            />
+          </label>
 
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Segmento do negócio</label>
-              <select
-                value={niche}
-                onChange={(e) => setNiche(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
-              >
-                {NICHES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <label className="block">
+            <span className="field-label">Segmento do negócio</span>
+            <select
+              className="field text-base"
+              value={niche}
+              onChange={(event) => setNiche(event.target.value)}
+            >
+              {NICHES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <button
             type="button"
             disabled={!userName.trim()}
             onClick={() => setStep(2)}
-            className="primary-button w-full mt-4"
+            className="primary-button"
           >
             Continuar
           </button>
@@ -147,25 +183,28 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
           <div>
             <p className="eyebrow">Passo 2 de 3</p>
             <h2 className="section-title">Horários de funcionamento</h2>
-            <p className="text-xs text-zinc-400 mt-1">
-              Informe os dias e horários em que o seu estabelecimento está aberto.
+            <p className="mt-1 text-xs text-muted">
+              Informe os dias e horários em que o seu estabelecimento está
+              aberto.
             </p>
           </div>
 
-          <div className="space-y-2 pt-2">
-            <label className="text-xs text-zinc-400 font-medium">Dias de funcionamento</label>
+          <div>
+            <span className="field-label">Dias de funcionamento</span>
             <div className="flex flex-wrap gap-2">
               {DAYS_OF_WEEK.map((day) => {
                 const active = businessDays.includes(day.id);
+
                 return (
                   <button
                     key={day.id}
                     type="button"
+                    aria-pressed={active}
                     onClick={() => toggleDay(day.id)}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
                       active
-                        ? "bg-lime-400 text-zinc-950"
-                        : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+                        ? "bg-acid text-ink"
+                        : "border border-white/10 bg-white/[0.05] text-muted hover:text-white"
                     }`}
                   >
                     {day.label}
@@ -173,39 +212,48 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
                 );
               })}
             </div>
+            {businessDays.length === 0 && (
+              <p className="mt-2 text-xs text-muted">
+                Escolha pelo menos um dia.
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Abertura</label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              <span className="field-label">Abertura</span>
               <input
+                className="field text-base [color-scheme:dark]"
                 type="time"
                 value={openingTime}
-                onChange={(e) => setOpeningTime(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
+                onChange={(event) => setOpeningTime(event.target.value)}
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-zinc-400 font-medium">Fechamento</label>
+            </label>
+
+            <label className="block">
+              <span className="field-label">Fechamento</span>
               <input
+                className="field text-base [color-scheme:dark]"
                 type="time"
                 value={closingTime}
-                onChange={(e) => setClosingTime(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
+                onChange={(event) => setClosingTime(event.target.value)}
               />
-            </div>
+            </label>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="w-1/3 py-2.5 rounded-xl border border-zinc-800 text-zinc-300 hover:bg-zinc-900 text-sm font-medium"
+              className={secondaryButton}
             >
               Voltar
             </button>
             <button
               type="button"
+              disabled={
+                businessDays.length === 0 || !openingTime || !closingTime
+              }
               onClick={() => setStep(3)}
               className="primary-button w-2/3"
             >
@@ -220,37 +268,42 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
           <div>
             <p className="eyebrow">Passo 3 de 3</p>
             <h2 className="section-title">Ticket médio estimado</h2>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="mt-1 text-xs text-muted">
               Qual é o valor médio gasto por cada cliente em cada compra?
             </p>
           </div>
 
-          <div className="space-y-2 pt-2">
-            <label className="text-xs text-zinc-400 font-medium">Ticket Médio (R$)</label>
+          <label className="block">
+            <span className="field-label">Ticket médio (R$)</span>
             <input
+              className="field text-base"
               type="number"
-              placeholder="Ex: 45.00"
+              inputMode="decimal"
+              min="0.01"
+              step="0.01"
+              placeholder="Ex: 45,00"
               value={averageTicket}
-              onChange={(e) => setAverageTicket(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-lime-400"
+              onKeyDown={handleTicketKeyDown}
+              onChange={(event) => setAverageTicket(event.target.value)}
             />
-          </div>
+          </label>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="w-1/3 py-2.5 rounded-xl border border-zinc-800 text-zinc-300 hover:bg-zinc-900 text-sm font-medium"
+              disabled={loading}
+              className={secondaryButton}
             >
               Voltar
             </button>
             <button
               type="button"
-              disabled={loading || !averageTicket}
+              disabled={loading || !(ticketValue > 0)}
               onClick={handleFinish}
               className="primary-button w-2/3"
             >
-              {loading ? "Concluindo..." : "Finalizar Onboarding"}
+              {loading ? "Concluindo..." : "Finalizar onboarding"}
             </button>
           </div>
         </div>
