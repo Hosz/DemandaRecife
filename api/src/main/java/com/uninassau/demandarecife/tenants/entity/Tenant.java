@@ -1,16 +1,19 @@
-package com.uninassau.demandarecife.tenants;
+package com.uninassau.demandarecife.tenants.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -38,7 +41,7 @@ public class Tenant {
     @Column(name = "nicho_atuacao", length = 50)
     private String nichoAtuacao;
 
-    @Column(name = "ticket_medio")
+    @Column(name = "ticket_medio", precision = 10, scale = 2)
     private BigDecimal ticketMedio;
 
     @Column(length = 100)
@@ -52,6 +55,10 @@ public class Tenant {
 
     @Column(name = "criado_em", insertable = false, updatable = false)
     private Instant criadoEm;
+
+    @ToString.Exclude
+    @OneToOne(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true)
+    private TenantProfile perfil;
 
     public Tenant(String nome, String cidade, String estado) {
         this.nome = nome;

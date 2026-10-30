@@ -1,6 +1,7 @@
-package com.uninassau.demandarecife.tenants;
+package com.uninassau.demandarecife.tenants.repository;
 
 import com.uninassau.demandarecife.tenants.dto.LocationDto;
+import com.uninassau.demandarecife.tenants.entity.Tenant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;

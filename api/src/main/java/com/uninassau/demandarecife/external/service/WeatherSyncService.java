@@ -10,7 +10,7 @@ import com.uninassau.demandarecife.external.support.OpenWeatherClient;
 import com.uninassau.demandarecife.external.support.WeatherAggregatorSupport;
 import com.uninassau.demandarecife.external.support.WeatherProperties;
 import com.uninassau.demandarecife.external.validator.ExternalSyncValidator;
-import com.uninassau.demandarecife.tenants.TenantRepository;
+import com.uninassau.demandarecife.tenants.repository.TenantRepository;
 import com.uninassau.demandarecife.tenants.dto.LocationDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
