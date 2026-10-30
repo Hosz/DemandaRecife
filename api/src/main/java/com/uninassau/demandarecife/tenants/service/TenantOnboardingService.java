@@ -1,5 +1,6 @@
 package com.uninassau.demandarecife.tenants.service;
 
+import com.uninassau.demandarecife.auth.repository.UsuarioRepository;
 import com.uninassau.demandarecife.tenants.dto.OnboardingRequestDto;
 import com.uninassau.demandarecife.tenants.dto.TenantResponseDto;
 import com.uninassau.demandarecife.tenants.entity.Tenant;
@@ -12,6 +13,9 @@ import com.uninassau.demandarecife.tenants.repository.TenantRepository;
 import com.uninassau.demandarecife.tenants.validator.TenantOnboardingValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,7 @@ public class TenantOnboardingService {
     private final TenantProfileRepository tenantProfileRepository;
     private final TenantFinder tenantFinder;
     private final TenantOnboardingValidator tenantOnboardingValidator;
+    private final UsuarioRepository usuarioRepository;
 
     @Transactional
     public TenantResponseDto onboard(OnboardingRequestDto request) {
@@ -40,7 +45,7 @@ public class TenantOnboardingService {
         TenantProfile savedProfile = tenantProfileRepository.save(profile);
         savedTenant.setPerfil(savedProfile);
 
-        // TODO: Associar/criar registro inicial em 'users' quando o módulo completo de Auth/OAuth2 for integrado.
+        vincularUsuarioAutenticado(savedTenant);
 
         log.info("Tenant criado com sucesso com ID: {} e perfil associado com ID: {}", savedTenant.getId(), savedProfile.getId());
         return TenantMapper.toResponseDto(savedTenant, savedProfile);
@@ -51,5 +56,25 @@ public class TenantOnboardingService {
         Tenant tenant = tenantFinder.findById(tenantId);
         TenantProfile profile = tenant.getPerfil();
         return TenantMapper.toResponseDto(tenant, profile);
+    }
+
+    private void vincularUsuarioAutenticado(Tenant tenant) {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth instanceof JwtAuthenticationToken jwtAuth) {
+                String sub = jwtAuth.getToken().getSubject();
+                if (sub != null && !sub.isBlank()) {
+                    UUID userId = UUID.fromString(sub);
+                    usuarioRepository.findById(userId).ifPresent(usuario -> {
+                        usuario.setTenant(tenant);
+                        usuarioRepository.save(usuario);
+                        log.info("Tenant '{}' (ID: {}) vinculado com sucesso ao usuário '{}' (ID: {})",
+                                tenant.getNome(), tenant.getId(), usuario.getNome(), usuario.getId());
+                    });
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Não foi possível vincular o tenant ao usuário a partir do token: {}", ex.getMessage());
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.uninassau.demandarecife.tenants.service;
 
+import com.uninassau.demandarecife.auth.repository.UsuarioRepository;
 import com.uninassau.demandarecife.tenants.dto.OnboardingRequestDto;
 import com.uninassau.demandarecife.tenants.dto.TenantResponseDto;
 import com.uninassau.demandarecife.tenants.entity.Tenant;
@@ -40,6 +41,9 @@ class TenantOnboardingServiceTest {
     @Mock
     private TenantOnboardingValidator tenantOnboardingValidator;
 
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
     private TenantOnboardingService tenantOnboardingService;
 
     @BeforeEach
@@ -48,7 +52,8 @@ class TenantOnboardingServiceTest {
                 tenantRepository,
                 tenantProfileRepository,
                 tenantFinder,
-                tenantOnboardingValidator
+                tenantOnboardingValidator,
+                usuarioRepository
         );
     }
 
