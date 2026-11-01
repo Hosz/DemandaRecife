@@ -76,6 +76,14 @@ const databaseIcon = (
   </Icon>
 );
 
+const cartIcon = (
+  <Icon>
+    <circle cx="8" cy="21" r="1" />
+    <circle cx="19" cy="21" r="1" />
+    <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+  </Icon>
+);
+
 const settingsIcon = (
   <Icon>
     <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -116,6 +124,7 @@ const MENU_ITEMS: NavItem[] = [
   { href: "/", label: "Início", icon: homeIcon },
   { href: "/previsoes", label: "Previsões", icon: forecastIcon },
   { href: "/estoque", label: "Estoque", icon: stockIcon },
+  { href: "/compras", label: "Compras", icon: cartIcon },
   { href: "/equipe", label: "Equipe", icon: teamIcon },
   { href: "/promocoes", label: "Promoções", icon: tagIcon },
   { href: "/dados", label: "Dados", icon: databaseIcon },
