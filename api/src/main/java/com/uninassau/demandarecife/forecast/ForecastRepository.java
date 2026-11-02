@@ -22,15 +22,14 @@ public class ForecastRepository {
     @SuppressWarnings("unchecked")
     public Map<UUID, Map<LocalDate, Integer>> vendasPorDia(UUID tenantId, LocalDate inicio, LocalDate fimExclusivo) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT product_id, CAST(data_hora_venda AS DATE), SUM(quantidade)
-                FROM sales_transactions
-                WHERE tenant_id = :tenantId
-                  AND data_hora_venda >= :inicio AND data_hora_venda < :fim
-                GROUP BY product_id, CAST(data_hora_venda AS DATE)
-                """)
+        SELECT product_id, dia, total_vendido
+        FROM mv_sales_daily
+        WHERE tenant_id = :tenantId
+          AND dia >= :inicio AND dia < :fim
+        """)
                 .setParameter("tenantId", tenantId)
-                .setParameter("inicio", inicio.atStartOfDay())
-                .setParameter("fim", fimExclusivo.atStartOfDay())
+                .setParameter("inicio", inicio)
+                .setParameter("fim", fimExclusivo)
                 .getResultList();
 
         Map<UUID, Map<LocalDate, Integer>> result = new HashMap<>();
@@ -45,11 +44,11 @@ public class ForecastRepository {
     @SuppressWarnings("unchecked")
     public Map<UUID, LocalDate> primeiraVenda(UUID tenantId) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT product_id, CAST(MIN(data_hora_venda) AS DATE)
-                FROM sales_transactions
-                WHERE tenant_id = :tenantId
-                GROUP BY product_id
-                """)
+        SELECT product_id, MIN(dia)
+        FROM mv_sales_daily
+        WHERE tenant_id = :tenantId
+        GROUP BY product_id
+        """)
                 .setParameter("tenantId", tenantId)
                 .getResultList();
 
