@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  useEffect,
   useState,
+  useSyncExternalStore,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -35,17 +35,28 @@ function getNowLocalInput() {
   return now.toISOString().slice(0, 16);
 }
 
+function subscribeToNothing() {
+  return () => {};
+}
+
+function getNowOnServer() {
+  return "";
+}
+
 export function SaleForm({ products, onSubmit }: SaleFormProps) {
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [totalValue, setTotalValue] = useState("");
-  const [soldAt, setSoldAt] = useState("");
+  const [editedSoldAt, setEditedSoldAt] = useState<string | null>(null);
   const [channel, setChannel] = useState(CHANNELS[0]);
   const [isSending, setIsSending] = useState(false);
 
-  useEffect(() => {
-    setSoldAt(getNowLocalInput());
-  }, []);
+  const defaultSoldAt = useSyncExternalStore(
+    subscribeToNothing,
+    getNowLocalInput,
+    getNowOnServer,
+  );
+  const soldAt = editedSoldAt ?? defaultSoldAt;
 
   function handleQuantityKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (BLOCKED_KEYS.includes(event.key)) {
@@ -55,7 +66,7 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSending) return;
+    if (isSending || !soldAt) return;
 
     setIsSending(true);
 
@@ -76,7 +87,7 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
       setProductId("");
       setQuantity("1");
       setTotalValue("");
-      setSoldAt(getNowLocalInput());
+      setEditedSoldAt(null);
       setChannel(CHANNELS[0]);
     }
   }
@@ -143,7 +154,7 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
           className="field text-base [color-scheme:dark]"
           type="datetime-local"
           value={soldAt}
-          onChange={(event) => setSoldAt(event.target.value)}
+          onChange={(event) => setEditedSoldAt(event.target.value)}
           disabled={isSending}
           required
         />

@@ -160,9 +160,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen]);
 
+    useEffect(() => {
+    const noop = () => {};
+    document.addEventListener("touchstart", noop, { passive: true });
+    return () => document.removeEventListener("touchstart", noop);
+  }, []);
+
   const onMainTab = MAIN_TABS.some((tab) => isActive(pathname, tab.href));
   const maisActive = menuOpen || !onMainTab;
 
+    if (pathname.startsWith("/onboarding")) {
+    return <>{children}</>;
+  }
+  
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/95 pt-[env(safe-area-inset-top)] backdrop-blur">
