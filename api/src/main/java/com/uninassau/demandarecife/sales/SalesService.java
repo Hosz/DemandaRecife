@@ -8,6 +8,7 @@ import com.uninassau.demandarecife.sales.dto.RowError;
 import com.uninassau.demandarecife.sales.dto.SaleRequest;
 import com.uninassau.demandarecife.sales.importer.SalesImporter;
 import com.uninassau.demandarecife.shared.util.TextNormalizer;
+import com.uninassau.demandarecife.inventory.InventoryService;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class SalesService {
     private final ProductRepository productRepository;
     private final List<SalesImporter> importers;   // o Spring injeta CSV e Excel
     private final EntityManager entityManager;
+    private final InventoryService inventoryService;
 
     @Transactional
     public SaleTransaction create(UUID tenantId, SaleRequest req) {
@@ -50,7 +52,9 @@ public class SalesService {
         sale.setPrecoUnitario(req.precoUnitario());
         sale.setDataHoraVenda(req.dataHoraVenda());
         sale.setOrigem("MANUAL");
-        return salesRepository.save(sale);
+        var saved = salesRepository.save(sale);
+        inventoryService.baixarVendaAvulsa(tenantId, saved.getProductId(), saved.getQuantidade(), saved.getDataHoraVenda());
+        return saved;
     }
 
     @Transactional
@@ -70,6 +74,8 @@ public class SalesService {
         // Carrega os produtos do tenant UMA vez (evita 1 SELECT por linha)
         Map<String, Product> bySku = new HashMap<>();
         Map<String, Product> byName = new HashMap<>();
+        Map<UUID, LocalDateTime> contagens = inventoryService.contagens(tenantId);
+        Map<UUID, Integer> saidas = new HashMap<>();
         for (Product p : productRepository.findByTenantId(tenantId)) {
             if (p.getSku() != null && !p.getSku().isBlank()) bySku.put(TextNormalizer.normalize(p.getSku()), p);
             byName.put(TextNormalizer.normalize(p.getNome()), p);
@@ -99,6 +105,11 @@ public class SalesService {
                 sale.setOrigem(origem);
                 batch.add(sale);
 
+                LocalDateTime contagem = contagens.get(product.getId());
+                if (contagem != null && data.isAfter(contagem)) {
+                    saidas.merge(product.getId(), qtd, Integer::sum);
+                }
+
                 if (batch.size() == BATCH_SIZE) { flush(batch); }
                 importadas++;
             } catch (IllegalArgumentException | DateTimeParseException e) {
@@ -107,6 +118,7 @@ public class SalesService {
             }
         }
         if (!batch.isEmpty()) flush(batch);
+        if (!saidas.isEmpty()) inventoryService.baixar(tenantId, saidas);
 
         return new ImportResult(rows.size(), importadas, erros);
     }

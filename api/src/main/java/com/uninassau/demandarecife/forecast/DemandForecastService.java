@@ -17,10 +17,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -108,5 +105,30 @@ public class DemandForecastService {
 
     private ForecastResult resultado(Product p, Ctx ctx, BigDecimal quantidade, Metodo metodo) {
         return new ForecastResult(p.getId(), ctx.alvo(), quantidade.setScale(2, RoundingMode.HALF_UP), metodo);
+    }
+
+    /** Previsão de vários dias seguidos, por produto. Carrega os dados uma única vez. */
+    @Transactional(readOnly = true)
+    public Map<UUID, List<ForecastResult>> forecastPeriod(UUID tenantId, LocalDate inicio, int dias) {
+        LocalDate hoje = LocalDate.now(ZONA);
+        var settings = forecastRepository.configuracoes(tenantId);
+        var diasAbertos = OperatingDays.parse(settings.diasFuncionamento());
+
+        var vendas = forecastRepository.vendasPorDia(tenantId, hoje.minusDays(JANELA_MAX), hoje);
+        var primeiras = forecastRepository.primeiraVenda(tenantId);
+
+        Map<UUID, List<ForecastResult>> resultado = new LinkedHashMap<>();
+        for (Product p : productRepository.findByTenantId(tenantId)) {
+            var vendasDoProduto = vendas.getOrDefault(p.getId(), Map.of());
+            var primeiraVenda = primeiras.get(p.getId());
+
+            List<ForecastResult> lista = new ArrayList<>();
+            for (int i = 0; i < dias; i++) {
+                var ctx = new Ctx(settings.nicho(), diasAbertos, hoje, inicio.plusDays(i));
+                lista.add(forecastProduct(p, ctx, vendasDoProduto, primeiraVenda));
+            }
+            resultado.put(p.getId(), lista);
+        }
+        return resultado;
     }
 }
