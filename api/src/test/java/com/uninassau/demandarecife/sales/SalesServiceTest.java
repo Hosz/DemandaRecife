@@ -1,5 +1,6 @@
 package com.uninassau.demandarecife.sales;
 
+import com.uninassau.demandarecife.inventory.InventoryService;
 import com.uninassau.demandarecife.products.Product;
 import com.uninassau.demandarecife.products.ProductRepository;
 import com.uninassau.demandarecife.sales.dto.RowError;
@@ -25,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +46,8 @@ class SalesServiceTest {
     ProductRepository productRepository;
     @Mock
     EntityManager entityManager;
+    @Mock
+    InventoryService inventoryService;
 
     SalesService service;
     List<SaleTransaction> saved;
@@ -52,7 +56,7 @@ class SalesServiceTest {
     void setUp() {
         // importadores REAIS: assim o teste cobre leitura + validação juntas
         service = new SalesService(salesRepository, productRepository,
-                List.of(new CsvSalesImporter(), new ExcelSalesImporter()), entityManager);
+                List.of(new CsvSalesImporter(), new ExcelSalesImporter()), entityManager, inventoryService);
 
         // O service limpa a lista depois do saveAll (batch.clear()),
         // então copiamos o conteúdo NO MOMENTO da chamada.
@@ -295,5 +299,52 @@ class SalesServiceTest {
         verify(salesRepository, times(3)).saveAll(any());   // 500 + 500 + 200
         verify(entityManager, times(3)).clear();
         verify(productRepository, times(1)).findByTenantId(TENANT); // 1 consulta, não 1200
+    }
+
+    @Test
+    void create_baixaOEstoqueDaVenda() {
+        UUID productId = UUID.randomUUID();
+        when(productRepository.existsByIdAndTenantId(productId, TENANT)).thenReturn(true);
+        when(salesRepository.save(any(SaleTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+        var data = LocalDateTime.of(2025, 10, 27, 9, 0);
+
+        service.create(TENANT, new SaleRequest(productId, 3, new BigDecimal("0.80"), data));
+
+        verify(inventoryService).baixarVendaAvulsa(TENANT, productId, 3, data);
+    }
+
+    @Test
+    void importFile_baixaOEstoquePeloTotalVendidoPorProduto() {
+        var pao = product("Pão Francês", "PAO-001", "0.80");
+        catalogo(pao);
+        when(inventoryService.contagens(TENANT))
+                .thenReturn(Map.of(pao.getId(), LocalDateTime.of(2025, 10, 1, 0, 0)));
+
+        service.importFile(TENANT, csv(HEADER
+                + "PAO-001;;50;0,80;27/10/2025\n"
+                + "PAO-001;;10;0,80;28/10/2025\n"));
+
+        verify(inventoryService).baixar(TENANT, Map.of(pao.getId(), 60));
+    }
+
+    @Test
+    void importFile_vendaAnteriorAContagemNaoBaixaEstoque() {
+        var pao = product("Pão Francês", "PAO-001", "0.80");
+        catalogo(pao);
+        when(inventoryService.contagens(TENANT))
+                .thenReturn(Map.of(pao.getId(), LocalDateTime.of(2025, 12, 1, 0, 0)));
+
+        service.importFile(TENANT, csv(HEADER + "PAO-001;;50;0,80;27/10/2025\n"));
+
+        verify(inventoryService, never()).baixar(any(), any());
+    }
+
+    @Test
+    void importFile_linhaInvalidaNaoBaixaEstoque() {
+        catalogo(product("Pão Francês", "PAO-001", "0.80"));
+
+        service.importFile(TENANT, csv(HEADER + ";Bolo Inexistente;2;5,00;27/10/2025\n"));
+
+        verify(inventoryService, never()).baixar(any(), any());
     }
 }
