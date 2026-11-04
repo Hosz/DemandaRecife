@@ -27,4 +27,8 @@ public interface InventoryRepository extends JpaRepository<InventoryLevel, UUID>
     int baixar(@Param("tenantId") UUID tenantId,
                @Param("productId") UUID productId,
                @Param("qtd") int quantidade);
+
+    // Quais negócios têm estoque cadastrado (o job só varre esses)
+    @Query("SELECT DISTINCT i.tenantId FROM InventoryLevel i")
+    List<UUID> findTenantIdsWithInventory();
 }
