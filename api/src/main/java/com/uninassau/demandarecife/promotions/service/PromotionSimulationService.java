@@ -1,7 +1,7 @@
-package com.uninassau.demandarecife.promotions;
+package com.uninassau.demandarecife.promotions.service;
 
-import com.uninassau.demandarecife.products.Product;
-import com.uninassau.demandarecife.products.ProductRepository;
+import com.uninassau.demandarecife.products.entity.Product;
+import com.uninassau.demandarecife.products.repository.ProductRepository;
 import com.uninassau.demandarecife.promotions.dto.PromotionSimulation;
 import com.uninassau.demandarecife.promotions.dto.PromotionSimulation.Status;
 import com.uninassau.demandarecife.shared.exception.ResourceNotFoundException;

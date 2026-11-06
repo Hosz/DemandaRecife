@@ -1,5 +1,6 @@
-package com.uninassau.demandarecife.promotions;
+package com.uninassau.demandarecife.promotions.controller;
 
+import com.uninassau.demandarecife.promotions.service.PromotionSimulationService;
 import com.uninassau.demandarecife.promotions.dto.PromotionSimulation;
 import com.uninassau.demandarecife.shared.tenant.CurrentTenant;
 import lombok.RequiredArgsConstructor;
