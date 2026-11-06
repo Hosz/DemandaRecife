@@ -20,4 +20,5 @@ public class Product {
     private String nome;
     private String sku;
     @Column(name = "preco_venda") private BigDecimal precoVenda;
+    @Column(name = "custo_unidade") private BigDecimal custoUnidade;
 }
