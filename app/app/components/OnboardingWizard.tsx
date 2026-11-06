@@ -55,6 +55,7 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
   const [averageTicket, setAverageTicket] = useState("");
 
   const ticketValue = Number(averageTicket);
+  const sameTimes = Boolean(openingTime) && openingTime === closingTime;
 
   function toggleDay(dayId: string) {
     setBusinessDays((previous) =>
@@ -241,6 +242,12 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
             </label>
           </div>
 
+          {sameTimes && (
+            <p className="text-xs text-muted">
+              Abertura e fechamento não podem ser iguais.
+            </p>
+          )}
+
           <div className="flex gap-3">
             <button
               type="button"
@@ -252,7 +259,10 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
             <button
               type="button"
               disabled={
-                businessDays.length === 0 || !openingTime || !closingTime
+                businessDays.length === 0 ||
+                !openingTime ||
+                !closingTime ||
+                sameTimes
               }
               onClick={() => setStep(3)}
               className="primary-button w-2/3"

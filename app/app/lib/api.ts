@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { withAuth } from "./auth";
 
 export type ApiResult = {
   ok: boolean;
@@ -50,7 +51,7 @@ async function request(
   fallbackError: string,
 ): Promise<ApiResult> {
   try {
-    const response = await fetch(`${API_URL}${path}`, init);
+    const response = await fetch(`${API_URL}${path}`, withAuth(init));
 
     if (response.ok) {
       return await onSuccess(response);
