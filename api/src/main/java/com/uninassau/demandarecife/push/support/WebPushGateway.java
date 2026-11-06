@@ -1,6 +1,6 @@
 package com.uninassau.demandarecife.push.support;
 
-import com.uninassau.demandarecife.push.PushSubscription;
+import com.uninassau.demandarecife.push.entity.PushSubscription;
 import lombok.extern.slf4j.Slf4j;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;

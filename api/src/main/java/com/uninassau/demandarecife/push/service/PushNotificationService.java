@@ -1,10 +1,10 @@
 package com.uninassau.demandarecife.push.service;
 
-import com.uninassau.demandarecife.alerts.AlertCreatedEvent;
+import com.uninassau.demandarecife.alerts.event.AlertCreatedEvent;
 import com.uninassau.demandarecife.push.support.PushGateway;
 import com.uninassau.demandarecife.push.support.PushPayload;
-import com.uninassau.demandarecife.push.PushSubscription;
-import com.uninassau.demandarecife.push.PushSubscriptionRepository;
+import com.uninassau.demandarecife.push.entity.PushSubscription;
+import com.uninassau.demandarecife.push.repository.PushSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;

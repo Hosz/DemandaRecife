@@ -1,6 +1,6 @@
 package com.uninassau.demandarecife.sales.dto;
 
-import com.uninassau.demandarecife.sales.SaleTransaction;
+import com.uninassau.demandarecife.sales.entity.SaleTransaction;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

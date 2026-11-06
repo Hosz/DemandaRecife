@@ -1,7 +1,7 @@
 package com.uninassau.demandarecife.push.service;
 
-import com.uninassau.demandarecife.push.PushSubscription;
-import com.uninassau.demandarecife.push.PushSubscriptionRepository;
+import com.uninassau.demandarecife.push.entity.PushSubscription;
+import com.uninassau.demandarecife.push.repository.PushSubscriptionRepository;
 import com.uninassau.demandarecife.push.dto.SubscribeRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
