@@ -9,6 +9,7 @@ import com.uninassau.demandarecife.shared.util.AppTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -26,6 +27,7 @@ public class StockAlertService {
 
     private final ReplenishmentService replenishmentService;
     private final OperationalAlertRepository alertRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public record Resultado(int criados, int resolvidos) {}
 
@@ -57,7 +59,10 @@ public class StockAlertService {
         int criados = 0;
         for (Map.Entry<String, ReplenishmentSuggestion> e : emRisco.entrySet()) {
             if (jaAlertados.contains(e.getKey())) continue;
-            alertRepository.save(novoAlerta(tenantId, e.getKey(), e.getValue()));
+            var alerta = novoAlerta(tenantId, e.getKey(), e.getValue());
+            alertRepository.save(alerta);
+            eventPublisher.publishEvent(new AlertCreatedEvent(tenantId, alerta.getProductId(), alerta.getTitulo(),
+                    alerta.getDescricao(), alerta.getPrioridade().name(), alerta.getChaveDeduplicacao()));
             criados++;
         }
         return new Resultado(criados, resolvidos);

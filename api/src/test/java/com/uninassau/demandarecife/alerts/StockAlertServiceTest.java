@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +32,7 @@ class StockAlertServiceTest {
 
     @Mock ReplenishmentService replenishmentService;
     @Mock OperationalAlertRepository alertRepository;
+    @Mock ApplicationEventPublisher eventPublisher;
     @InjectMocks StockAlertService service;
 
     private ReplenishmentSuggestion sugestao(int atual, boolean comprar) {
@@ -136,5 +138,27 @@ class StockAlertServiceTest {
         verify(alertRepository, never()).save(any());
         assertThat(resultado.criados()).isZero();
         assertThat(resultado.resolvidos()).isZero();
+    }
+
+    @Test
+    void alertaNovoPublicaEventoParaOPush() {
+        cenario(List.of(sugestao(0, true)), List.of());
+
+        service.avaliarEstoque(TENANT);
+
+        var captor = ArgumentCaptor.forClass(AlertCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().tenantId()).isEqualTo(TENANT);
+        assertThat(captor.getValue().titulo()).contains("Pão Francês");
+        assertThat(captor.getValue().prioridade()).isEqualTo("ALTA");
+    }
+
+    @Test
+    void problemaQueContinuaNaoPublicaEvento() {
+        cenario(List.of(sugestao(3, true)), List.of(alertaAtivo(AlertType.ESTOQUE_BAIXO)));
+
+        service.avaliarEstoque(TENANT);
+
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }
