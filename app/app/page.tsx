@@ -196,13 +196,21 @@ function EmptyState({
 }
 
 function FlowChart({ points }: { points: FlowPoint[] }) {
-  const scaleMax = Math.max(...points.map((point) => point.value), 1) * 1.1;
+  const peak = Math.max(...points.map((point) => point.value), 0);
+  const peakIndex =
+    peak > 0 ? points.findIndex((point) => point.value === peak) : -1;
+  const scaleMax = Math.max(peak, 1) * 1.1;
+  const peakHour = peakIndex >= 0 ? points[peakIndex].hour : null;
 
   return (
     <div
       className="mt-6"
       role="img"
-      aria-label="Gráfico de fluxo de clientes por horário"
+      aria-label={
+        peakHour
+          ? `Gráfico de fluxo de clientes por horário. Pico de ${peak} às ${peakHour}`
+          : "Gráfico de fluxo de clientes por horário"
+      }
     >
       <div className="relative h-44 border-b border-white/10 px-1">
         {[0, 1, 2].map((line) => (
@@ -214,7 +222,7 @@ function FlowChart({ points }: { points: FlowPoint[] }) {
         ))}
 
         <div className="relative flex h-full items-end gap-2.5">
-          {points.map((point) => (
+          {points.map((point, index) => (
             <div
               key={point.hour}
               className="relative flex-1 rounded-t-md"
@@ -223,7 +231,7 @@ function FlowChart({ points }: { points: FlowPoint[] }) {
                 background: "linear-gradient(to bottom, #d6ff00, #3b4600)",
               }}
             >
-              {point.highlight && (
+              {index === peakIndex && (
                 <span className="absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 rounded-md bg-white px-2 py-0.5 text-[11px] font-bold text-ink shadow">
                   {point.value}
                 </span>
