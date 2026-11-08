@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { withAuth } from "./auth";
 
 export type DailyBriefingData = {
   updatedAt?: string;
@@ -30,9 +31,10 @@ export type DailyBriefingData = {
 
 export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
   try {
-    const response = await fetch(`${API_URL}/api/dashboard/daily-briefing`, {
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${API_URL}/api/dashboard/daily-briefing`,
+      withAuth({ cache: "no-store" }),
+    );
 
     if (!response.ok) return null;
 
