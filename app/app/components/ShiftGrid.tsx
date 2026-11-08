@@ -2,69 +2,93 @@
 
 import { useState } from "react";
 
-const DAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const SHIFTS = ["Manhã", "Tarde", "Noite"];
-const STAFF = ["Ana", "Bruno", "Carla", "Diego"];
-
-function slotKey(day: string, shift: string) {
-  return `${day}-${shift}`;
+interface Turno {
+  horario: string;
+  demanda: string;
+  tipoDemanda: "baixa" | "media" | "alta";
+  funcionarios: string[];
+  vagaPendente?: boolean;
 }
 
-export function ShiftGrid() {
-  const [allocations, setAllocations] = useState<Record<string, string>>({});
+const SHIFTS_DATA: Turno[] = [
+  {
+    horario: "06h–12h",
+    demanda: "Demanda média",
+    tipoDemanda: "media",
+    funcionarios: ["Marina", "João"],
+  },
+  {
+    horario: "12h–17h",
+    demanda: "Demanda baixa",
+    tipoDemanda: "baixa",
+    funcionarios: ["João", "Carla"],
+  },
+  {
+    horario: "17h–21h",
+    demanda: "Demanda alta",
+    tipoDemanda: "alta",
+    funcionarios: ["Marina", "Carla"],
+    vagaPendente: true,
+  },
+];
 
-  function handleChange(key: string, staff: string) {
-    setAllocations((prev) => ({ ...prev, [key]: staff }));
-  }
+export function ShiftGrid() {
+  const [shifts] = useState<Turno[]>(SHIFTS_DATA);
 
   return (
-    <section className="panel">
-      <h2 className="section-title">Turnos da semana</h2>
-      <p className="mt-1 text-sm text-muted">
-                Escolha quem trabalha em cada turno.
-      </p>
+    <section className="space-y-4">
+      <div className="mb-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-[#D4FF00]">
+          ESCALA SUGERIDA · QUA 12
+        </p>
+        <h2 className="text-xl font-bold text-white">Cobertura por turno</h2>
+      </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <div className="grid min-w-[52rem] grid-cols-[4.5rem_repeat(7,1fr)] gap-2">
-          <div />
-          {DAYS.map((day) => (
-            <div
-              key={day}
-              className="text-center text-xs font-semibold text-muted"
+      <div className="space-y-3">
+        {shifts.map((shift, idx) => (
+          <div
+            key={idx}
+            className="rounded-2xl border border-zinc-800 bg-[#121214] p-4 transition-all"
+          >
+            <div className="mb-3">
+              <h3 className="text-lg font-bold text-white">{shift.horario}</h3>
+              <p
+                className={`text-xs font-medium ${
+                  shift.tipoDemanda === "alta"
+                    ? "text-[#D4FF00]"
+                    : "text-zinc-400"
+                }`}
+              >
+                {shift.demanda}
+              </p>
+            </div>
+
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {shift.funcionarios.map((nome) => (
+                <span
+                  key={nome}
+                  className="rounded-full bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-200"
+                >
+                  {nome}
+                </span>
+              ))}
+
+              {shift.vagaPendente && (
+                <span className="rounded-full border border-dashed border-[#D4FF00] px-3 py-1.5 text-xs font-semibold text-[#D4FF00]">
+                  +1 vaga
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/60 py-2.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800"
             >
-              {day}
-            </div>
-          ))}
-
-          {SHIFTS.map((shift) => (
-            <div key={shift} className="contents">
-              <div className="flex items-center text-xs font-semibold text-muted">
-                {shift}
-              </div>
-              {DAYS.map((day) => {
-                                const key = slotKey(day, shift);
-                const value = allocations[key] ?? "";
-
-                return (
-                  <select
-                    key={key}
-                    value={value}
-                    onChange={(event) => handleChange(key, event.target.value)}
-                    aria-label={`Turno ${shift} de ${day}`}
-                    className="field"
-                  >
-                    <option value="">Vazio</option>
-                    {STAFF.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+              <span></span>
+              Editar
+            </button>
+          </div>
+        ))}
       </div>
     </section>
   );
