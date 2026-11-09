@@ -150,6 +150,9 @@ function DemandChart({ data }: { data: ForecastItem[] }) {
   }
 
   const maxValue = Math.max(...chartData.map(([, value]) => value), 1);
+  const bottomY = 88;
+  const topY = 16;
+  const height = bottomY - topY;
 
   const points = chartData.map(([date, value], index) => {
     const x =
@@ -157,14 +160,14 @@ function DemandChart({ data }: { data: ForecastItem[] }) {
         ? 50
         : 8 + (index / (chartData.length - 1)) * 84;
 
-    const y = 88 - (value / maxValue) * 72;
+    const y = bottomY - (value / maxValue) * height;
 
     return { date, value, x, y };
   });
 
-  const line = points
-    .map((point) => `${point.x},${point.y}`)
-    .join(" ");
+  const line = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const firstX = points[0].x.toFixed(1);
+  const lastX = points[points.length - 1].x.toFixed(1);
 
   return (
     <div className="pt-4">
@@ -194,15 +197,15 @@ function DemandChart({ data }: { data: ForecastItem[] }) {
         ))}
 
         <polygon
-          points={`8,88 ${line} 92,88`}
-          fill="rgba(214,255,0,0.10)"
+          points={`${firstX},${bottomY} ${line} ${lastX},${bottomY}`}
+          fill="rgba(214,255,0,0.12)"
         />
 
         <polyline
           points={line}
           fill="none"
           stroke="#d6ff00"
-          strokeWidth="1.5"
+          strokeWidth="2"
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -213,10 +216,10 @@ function DemandChart({ data }: { data: ForecastItem[] }) {
             key={point.date}
             cx={point.x}
             cy={point.y}
-            r="1.7"
+            r="2"
             fill="#d6ff00"
             stroke="#121212"
-            strokeWidth="0.7"
+            strokeWidth="0.8"
             vectorEffect="non-scaling-stroke"
           />
         ))}
@@ -253,8 +256,9 @@ export default function PrevisoesPage() {
       if (typeof window === "undefined") return;
       const token = localStorage.getItem("access_token");
 
+      // Se não há token, não inventa dados nem exibe erro: deixa a lista limpa
       if (!token) {
-        setError("Token de autenticação não encontrado. Faça login novamente.");
+        setForecasts([]);
         setLoading(false);
         return;
       }
@@ -266,14 +270,8 @@ export default function PrevisoesPage() {
         },
       });
 
-      if (response.status === 401) {
-        setError("Sessão expirada ou não autenticada (401). Verifique suas credenciais.");
-        setLoading(false);
-        return;
-      }
-
-      if (response.status === 403) {
-        setError("Acesso não autorizado ao recurso de previsões (403).");
+      if (response.status === 401 || response.status === 403) {
+        setForecasts([]);
         setLoading(false);
         return;
       }
@@ -289,9 +287,9 @@ export default function PrevisoesPage() {
       const result: unknown = await response.json();
 
       if (!Array.isArray(result)) {
-        throw new Error(
-          "A resposta da API está em um formato inesperado (não é uma lista).",
-        );
+        setForecasts([]);
+        setLoading(false);
+        return;
       }
 
       const normalized = result
@@ -305,12 +303,6 @@ export default function PrevisoesPage() {
         );
 
       setForecasts(normalized);
-
-      if (normalized.length === 0 && result.length > 0) {
-        setError(
-          "A API retornou dados, mas nenhum registro corresponde ao formato esperado.",
-        );
-      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -598,7 +590,7 @@ export default function PrevisoesPage() {
                     >
                       <td className="px-6 py-4">
                         <p className="text-xs font-semibold text-white">
-                          Produto
+                          Produto {item.productId}
                         </p>
                         <p className="mt-1 text-[10px] text-muted">
                           ID: {item.productId}

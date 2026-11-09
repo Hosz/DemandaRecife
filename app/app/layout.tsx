@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import { AppShell } from "./components/AppShell";
 import { ToastProvider } from "./components/ToastProvider";
+import { SyncProvider } from "./components/SyncProvider";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -37,7 +38,9 @@ export default function RootLayout({
     >
       <body className="min-h-[100dvh] flex flex-col bg-ink text-white">
         <ToastProvider>
-          <AppShell>{children}</AppShell>
+          <SyncProvider>
+            <AppShell>{children}</AppShell>
+          </SyncProvider>
         </ToastProvider>
       </body>
     </html>

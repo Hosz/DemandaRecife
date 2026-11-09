@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 import { withAuth } from "./auth";
 
 export type DailyBriefingData = {
@@ -27,22 +27,13 @@ export type DailyBriefingData = {
     suggestedQty: string;
   }[];
   opportunity?: { title: string; description: string };
+  // RF09: Campo de Insight textual gerado pela IA
+  aiInsight?: {
+    title: string;
+    text: string;
+    impacto?: string;
+  };
 };
-
-export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
-  try {
-    const response = await fetch(
-      `${API_URL}/api/dashboard/daily-briefing`,
-      withAuth({ cache: "no-store" }),
-    );
-
-    if (!response.ok) return null;
-
-    return (await response.json()) as DailyBriefingData;
-  } catch {
-    return null;
-  }
-}
 
 export const EXAMPLE_BRIEFING: DailyBriefingData = {
   weather: {
@@ -59,6 +50,12 @@ export const EXAMPLE_BRIEFING: DailyBriefingData = {
     stockAlertsCount: 3,
     modelAccuracy: "91,8%",
     accuracyDiff: "+2,4%",
+  },
+  // RF09: Dica/Insight gerado pelo motor preditivo
+  aiInsight: {
+    title: "Recomendação Preditiva da IA",
+    text: "Detectamos um pico atípico previsto para as 18h com alta rotação de panificados e frios. Sugerimos antecipar a segunda fornada de pães para as 16h30 e preparar a reposição de queijos para evitar rupturas na hora de pico.",
+    impacto: "Potencial de +12% em conversão",
   },
   customerFlow: [
     { hour: "08h", value: 30 },
@@ -115,3 +112,24 @@ export const EXAMPLE_BRIEFING: DailyBriefingData = {
       "Ofereça até 18% de desconto nos iogurtes e preserve uma margem positiva de 12%.",
   },
 };
+
+export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
+  const ENABLE_BACKEND_DASHBOARD = false;
+
+  if (!ENABLE_BACKEND_DASHBOARD) {
+    return EXAMPLE_BRIEFING;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/dashboard/daily-briefing`,
+      withAuth({ cache: "no-store" }),
+    );
+
+    if (!response.ok) return null;
+
+    return (await response.json()) as DailyBriefingData;
+  } catch {
+    return null;
+  }
+}

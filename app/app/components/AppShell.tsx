@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { requestAndSubscribePush } from "../lib/push";
+import { registrarVenda } from "../lib/sales-service";
 
 type NavItem = {
   href: string;
@@ -113,6 +115,13 @@ const bellIcon = (
   </Icon>
 );
 
+// Notificações operacionais extraídas do Figma
+const NOTIFICACOES_FIGMA = [
+  "Leite pode acabar às 16h",
+  "Escala precisa de reforço",
+  "Promoção sugerida para iogurtes",
+];
+
 const MAIN_TABS: NavItem[] = [
   { href: "/", label: "Início", icon: homeIcon },
   { href: "/previsoes", label: "Previsões", icon: forecastIcon },
@@ -149,22 +158,91 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Estado do painel suspenso de Notificações (Figma)
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Estados do Modal "Registrar Venda"
+  const [modalVendaOpen, setModalVendaOpen] = useState(false);
+  const [produto, setProduto] = useState("");
+  const [quantidade, setQuantidade] = useState("");
+  const [valorTotal, setValorTotal] = useState("");
+  const [salvandoVenda, setSalvandoVenda] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Registra Service Worker / Push em background sem bloquear a UI
   useEffect(() => {
-    if (!menuOpen) return;
+    if (typeof window !== "undefined") {
+      void requestAndSubscribePush().catch(() => {});
+    }
+  }, []);
+
+  // Fechamento no ESC
+  useEffect(() => {
+    if (!menuOpen && !modalVendaOpen && !notifOpen) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        setModalVendaOpen(false);
+        setNotifOpen(false);
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [menuOpen]);
+  }, [menuOpen, modalVendaOpen, notifOpen]);
+
+  // Fechar o dropdown de notificações se clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+
+    if (notifOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifOpen]);
 
   useEffect(() => {
     const noop = () => {};
     document.addEventListener("touchstart", noop, { passive: true });
     return () => document.removeEventListener("touchstart", noop);
   }, []);
+
+  // Manipulador de Registro de Venda (Online ou Offline via IndexedDB)
+  async function handleSubmitVenda(e: React.FormEvent) {
+    e.preventDefault();
+    if (!produto || !quantidade || !valorTotal) return;
+
+    setSalvandoVenda(true);
+    try {
+      const result = await registrarVenda({
+        productId: produto,
+        quantidade: Number(quantidade.replace(",", ".")),
+        valorUnitario: Number(valorTotal.replace(",", ".")) / (Number(quantidade.replace(",", ".")) || 1),
+        dataHora: new Date().toISOString(),
+      });
+
+      setToastMessage(
+        result.offline
+          ? "Salvo no modo offline! Sincronizará quando a rede voltar."
+          : "Venda registrada com sucesso!",
+      );
+      setProduto("");
+      setQuantidade("");
+      setValorTotal("");
+      setModalVendaOpen(false);
+    } catch {
+      setToastMessage("Erro ao registrar venda.");
+    } finally {
+      setSalvandoVenda(false);
+      setTimeout(() => setToastMessage(null), 3500);
+    }
+  }
 
   const onMainTab = MAIN_TABS.some((tab) => isActive(pathname, tab.href));
   const maisActive = menuOpen || !onMainTab;
@@ -175,31 +253,111 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed top-16 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-acid/30 bg-[#16171a]/95 px-4 py-2.5 text-xs font-semibold text-white shadow-xl backdrop-blur">
+          {toastMessage}
+        </div>
+      )}
+
       <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/95 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <Link
             href="/"
-            onClick={() => setMenuOpen(false)}
+            onClick={() => {
+              setMenuOpen(false);
+              setNotifOpen(false);
+            }}
             aria-label="Ir para o início"
             className="grid size-10 place-items-center rounded-xl bg-acid font-display text-lg font-bold text-ink"
           >
             N
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="relative flex items-center gap-2" ref={notifRef}>
+            {/* Botão de Notificações com Indicador Neon Verde (Figma) */}
             <button
               type="button"
-              disabled
-              aria-label="Notificações"
-              title="Em breve"
-              className="relative grid size-10 cursor-not-allowed place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white opacity-40"
+              onClick={() => {
+                setNotifOpen((prev) => !prev);
+                setMenuOpen(false);
+              }}
+              aria-label="Ver notificações"
+              aria-expanded={notifOpen}
+              className={`${headerButtonClass} ${
+                notifOpen ? "border-acid text-acid bg-acid/10" : ""
+              }`}
             >
               {bellIcon}
+              <span className="absolute top-2 right-2 size-2 rounded-full bg-[#d6ff00] shadow-[0_0_8px_#d6ff00]" />
             </button>
 
+            {/* Painel Dropdown de Notificações (Figma) */}
+            {notifOpen && (
+              <div
+                role="region"
+                aria-label="Notificações"
+                className="absolute right-0 top-12 z-50 w-72 sm:w-80 rounded-2xl border border-white/10 bg-[#191a1d] p-4 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <h3 className="text-xs font-bold text-white tracking-wide">
+                    Notificações
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setNotifOpen(false)}
+                    className="text-[11px] font-medium text-white/50 hover:text-white transition"
+                  >
+                    Fechar
+                  </button>
+                </div>
+
+                <ul className="divide-y divide-white/5">
+                  {NOTIFICACOES_FIGMA.map((item, index) => (
+                    <li key={index} className="flex items-center gap-2.5 py-3 first:pt-3 last:pb-1">
+                      <span className="size-2 shrink-0 rounded-full bg-[#d6ff00]" />
+                      <span className="text-xs text-white/85 font-medium leading-tight">
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Botão Desktop: + Nova entrada */}
             <button
               type="button"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => {
+                setModalVendaOpen(true);
+                setNotifOpen(false);
+              }}
+              className="hidden md:inline-flex items-center gap-1.5 rounded-xl bg-acid px-3.5 py-2.5 text-xs font-bold text-ink transition hover:brightness-105 active:scale-95 shadow-sm"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              <span>Nova entrada</span>
+            </button>
+
+            {/* Botão Hambúrguer / Fechar Menu */}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen((open) => !open);
+                setNotifOpen(false);
+              }}
               aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
               aria-expanded={menuOpen}
               aria-controls="menu-principal"
@@ -243,10 +401,126 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {/* Container principal com compensação para a Bottom Navigation no mobile */}
-      <div className="flex flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-8">
+      <div className="flex flex-1 flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-8">
         {children}
       </div>
 
+      {/* Botão Flutuante Verde-Limão (+) para Registrar Venda - Exclusivo Mobile */}
+      <aside aria-label="Ações rápidas" className="md:hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setModalVendaOpen(true);
+            setNotifOpen(false);
+          }}
+          aria-label="Registrar uma venda"
+          className="fixed bottom-[calc(4.8rem+env(safe-area-inset-bottom))] right-4 z-40 grid size-13 place-items-center rounded-full bg-[#d6ff00] text-[#111214] shadow-lg shadow-[#d6ff00]/25 transition hover:scale-105 active:scale-95"
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+        </button>
+      </aside>
+
+      {/* Modal Figma: ENTRADA RÁPIDA - Registrar uma venda */}
+      {modalVendaOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-venda-title"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center backdrop-blur-sm"
+        >
+          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#16171a] p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#d6ff00]">
+                  Entrada Rápida
+                </p>
+                <h2 id="modal-venda-title" className="mt-1 font-display text-xl font-bold text-white">
+                  Registrar uma venda
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalVendaOpen(false)}
+                aria-label="Fechar formulário"
+                className="grid size-9 place-items-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                {closeIcon}
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitVenda} className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="input-produto" className="block text-xs font-medium text-white/70">
+                  Produto
+                </label>
+                <input
+                  id="input-produto"
+                  type="text"
+                  required
+                  placeholder="Pão francês"
+                  value={produto}
+                  onChange={(e) => setProduto(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#1f2024] px-4 py-3 text-sm text-white placeholder-white/30 focus:border-[#d6ff00] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="input-quantidade" className="block text-xs font-medium text-white/70">
+                    Quantidade
+                  </label>
+                  <input
+                    id="input-quantidade"
+                    type="text"
+                    required
+                    placeholder="20"
+                    value={quantidade}
+                    onChange={(e) => setQuantidade(e.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#1f2024] px-4 py-3 text-sm text-white placeholder-white/30 focus:border-[#d6ff00] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="input-valor-total" className="block text-xs font-medium text-white/70">
+                    Valor total
+                  </label>
+                  <input
+                    id="input-valor-total"
+                    type="text"
+                    required
+                    placeholder="16,00"
+                    value={valorTotal}
+                    onChange={(e) => setValorTotal(e.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#1f2024] px-4 py-3 text-sm text-white placeholder-white/30 focus:border-[#d6ff00] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={salvandoVenda}
+                className="mt-2 w-full rounded-2xl bg-[#d6ff00] py-3.5 text-center font-display text-sm font-bold text-[#111214] transition hover:brightness-105 disabled:opacity-50"
+              >
+                {salvandoVenda ? "Salvando..." : "Salvar entrada"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Navegação Inferior (Bottom Bar) */}
       <nav
         aria-label="Navegação principal"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
@@ -259,7 +533,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <li key={tab.href} className="flex-1">
                 <Link
                   href={tab.href}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setNotifOpen(false);
+                  }}
                   aria-current={active ? "page" : undefined}
                   className={tabClass(active)}
                 >
@@ -273,7 +550,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <li className="flex-1">
             <button
               type="button"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => {
+                setMenuOpen((open) => !open);
+                setNotifOpen(false);
+              }}
               aria-expanded={menuOpen}
               aria-controls="menu-principal"
               className={tabClass(maisActive)}
