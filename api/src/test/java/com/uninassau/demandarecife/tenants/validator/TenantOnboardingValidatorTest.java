@@ -41,6 +41,26 @@ class TenantOnboardingValidatorTest {
     }
 
     @Test
+    void validateOnboarding_quandoTicketMedioNulo_naoLancaExcecao() {
+        OnboardingRequestDto request = new OnboardingRequestDto(
+                "Marina",
+                "Padaria Delícia",
+                "Padaria / Confeitaria",
+                List.of("SEG", "TER", "QUA", "QUI", "SEX"),
+                "08:00",
+                "18:00",
+                null,
+                "Recife",
+                "PE",
+                "Boa Viagem",
+                null
+        );
+
+        assertThatCode(() -> validator.validateOnboarding(request))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void validateOnboarding_quandoRequestNulo_lancaBadRequestException() {
         assertThatThrownBy(() -> validator.validateOnboarding(null))
                 .isInstanceOf(BadRequestException.class)

@@ -7,6 +7,7 @@ import com.uninassau.demandarecife.auth.dto.response.LoginResponse;
 import com.uninassau.demandarecife.auth.dto.response.RegistroResponse;
 import com.uninassau.demandarecife.auth.dto.response.UsuarioResponse;
 import com.uninassau.demandarecife.auth.service.AuthService;
+import com.uninassau.demandarecife.shared.exception.UnauthorizedException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,9 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<UsuarioResponse> me(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) {
+            throw new UnauthorizedException("Usuário não autenticado.");
+        }
         UUID userId = UUID.fromString(jwt.getSubject());
         UsuarioResponse response = authService.obterUsuarioAutenticado(userId);
         return ResponseEntity.ok(response);

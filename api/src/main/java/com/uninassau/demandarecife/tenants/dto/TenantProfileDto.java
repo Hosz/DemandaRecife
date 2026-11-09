@@ -9,5 +9,10 @@ public record TenantProfileDto(
         String responsavelNome,
         LocalTime horarioAbertura,
         LocalTime horarioFechamento,
-        List<String> diasFuncionamento
-) {}
+        List<String> diasFuncionamento,
+        Boolean usarBenchmarksColdStart
+) {
+    public TenantProfileDto(UUID profileId, String responsavelNome, LocalTime horarioAbertura, LocalTime horarioFechamento, List<String> diasFuncionamento) {
+        this(profileId, responsavelNome, horarioAbertura, horarioFechamento, diasFuncionamento, Boolean.TRUE);
+    }
+}

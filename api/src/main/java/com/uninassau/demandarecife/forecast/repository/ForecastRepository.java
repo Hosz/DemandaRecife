@@ -16,7 +16,11 @@ public class ForecastRepository {
 
     private final EntityManager em;
 
-    public record TenantSettings(String nicho, String diasFuncionamento) {}
+    public record TenantSettings(String nicho, String diasFuncionamento, Boolean usarBenchmarksColdStart) {
+        public TenantSettings(String nicho, String diasFuncionamento) {
+            this(nicho, diasFuncionamento, true);
+        }
+    }
 
     /** produto -> (dia -> total vendido). Só dias com venda; os dias sem venda o cálculo trata. */
     @SuppressWarnings("unchecked")
@@ -60,7 +64,7 @@ public class ForecastRepository {
     @SuppressWarnings("unchecked")
     public TenantSettings configuracoes(UUID tenantId) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT t.nicho_atuacao, p.dias_funcionamento
+                SELECT t.nicho_atuacao, p.dias_funcionamento, p.usar_benchmarks_cold_start
                 FROM tenants t
                 LEFT JOIN tenant_profiles p ON p.tenant_id = t.id
                 WHERE t.id = :tenantId
@@ -68,9 +72,10 @@ public class ForecastRepository {
                 .setParameter("tenantId", tenantId)
                 .getResultList();
 
-        if (rows.isEmpty()) return new TenantSettings(null, null);
+        if (rows.isEmpty()) return new TenantSettings(null, null, true);
         Object[] r = rows.get(0);
-        return new TenantSettings((String) r[0], (String) r[1]);
+        Boolean usarColdStart = r.length > 2 && r[2] != null ? (Boolean) r[2] : true;
+        return new TenantSettings((String) r[0], (String) r[1], usarColdStart);
     }
 
     // O driver pode devolver tipos diferentes conforme a versão, então convertemos com segurança.

@@ -3,20 +3,47 @@
 import { useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { OnboardingData } from "../lib/api";
-
-const CONTINUE_WHEN_API_FAILS = true;
+import { getUser } from "../lib/auth";
+import { SEGMENT_CATEGORIES, ALL_SEGMENT_OPTIONS } from "../lib/segments";
 
 type OnboardingWizardProps = {
   onSubmit: (data: OnboardingData) => Promise<boolean>;
 };
 
-const NICHES = [
-  "Padaria / Confeitaria",
-  "Salão de Beleza / Estética",
-  "Autopeças / Oficina",
-  "Mercado / Mercearia",
-  "Restaurante / Bar",
-  "Loja de Roupas / Vestuário",
+const RECIFE_BAIRROS = [
+  "Boa Viagem",
+  "Pina",
+  "Setúbal",
+  "Brasília Teimosa",
+  "Imbiribeira",
+  "Ipsep",
+  "Ibura",
+  "Recife Antigo",
+  "Santo Amaro",
+  "Boa Vista",
+  "Soledade",
+  "Derby",
+  "Espinheiro",
+  "Graças",
+  "Aflitos",
+  "Jaqueira",
+  "Parnamirim",
+  "Casa Forte",
+  "Casa Amarela",
+  "Tamarineira",
+  "Encruzilhada",
+  "Torre",
+  "Madalena",
+  "Prado",
+  "Cordeiro",
+  "Várzea",
+  "Caxangá",
+  "Iputinga",
+  "Afogados",
+  "San Martin",
+  "Areias",
+  "Barro",
+  "Tejipió",
   "Outro",
 ];
 
@@ -41,18 +68,35 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const [userName, setUserName] = useState("");
-  const [niche, setNiche] = useState(NICHES[0]);
+  const [userName, setUserName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return getUser()?.nome ?? "";
+  });
+  const [businessName, setBusinessName] = useState("");
+  const [bairro, setBairro] = useState(RECIFE_BAIRROS[0]);
+  const [niche, setNiche] = useState(ALL_SEGMENT_OPTIONS[0].value);
+  const [customNiche, setCustomNiche] = useState("");
   const [businessDays, setBusinessDays] = useState<string[]>([
     "SEG",
     "TER",
     "QUA",
     "QUI",
     "SEX",
+    "SAB",
   ]);
-  const [openingTime, setOpeningTime] = useState("08:00");
-  const [closingTime, setClosingTime] = useState("18:00");
-  const [averageTicket, setAverageTicket] = useState("");
+  const [openingTime, setOpeningTime] = useState(ALL_SEGMENT_OPTIONS[0].defaultOpening);
+  const [closingTime, setClosingTime] = useState(ALL_SEGMENT_OPTIONS[0].defaultClosing);
+  const [averageTicket, setAverageTicket] = useState(ALL_SEGMENT_OPTIONS[0].defaultTicket.toFixed(2));
+
+  function handleNicheChange(selectedValue: string) {
+    setNiche(selectedValue);
+    const match = ALL_SEGMENT_OPTIONS.find((o) => o.value === selectedValue);
+    if (match) {
+      setOpeningTime(match.defaultOpening);
+      setClosingTime(match.defaultClosing);
+      setAverageTicket(match.defaultTicket.toFixed(2));
+    }
+  }
 
   const ticketValue = Number(averageTicket);
   const sameTimes = Boolean(openingTime) && openingTime === closingTime;
@@ -71,24 +115,31 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
     }
   }
 
-  async function handleFinish() {
+  async function handleFinish(skipTicket = false) {
     if (loading) return;
 
     setLoading(true);
     const name = userName.trim();
 
+    const finalNiche = niche === "Outro" && customNiche.trim() ? customNiche.trim() : niche;
+
     const success = await onSubmit({
       userName: name,
-      niche,
+      businessName: businessName.trim() || undefined,
+      niche: finalNiche,
       businessDays,
       openingTime,
       closingTime,
-      averageTicket: ticketValue,
+      averageTicket: !skipTicket && ticketValue > 0 ? ticketValue : undefined,
+      cidade: "Recife",
+      estado: "PE",
+      bairro: bairro.trim() || undefined,
+      usarBenchmarksColdStart: true,
     });
 
     setLoading(false);
 
-    if (success || CONTINUE_WHEN_API_FAILS) {
+    if (success) {
       localStorage.setItem("user_name", name);
       router.replace("/");
     }
@@ -132,41 +183,93 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
           <div>
             <p className="eyebrow">Passo 1 de 3</p>
             <h2 className="section-title">
-              Como podemos te chamar e qual o seu nicho?
+              Dados do responsável e do estabelecimento
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Informações básicas para personalizar seu acesso e calibrar as
-              previsões.
+              Informações essenciais para calibrar as previsões de demanda por bairro no Recife.
             </p>
           </div>
 
-          <label className="block">
-            <span className="field-label">Seu nome</span>
-            <input
-              className="field text-base"
-              type="text"
-              placeholder="Ex: Marina"
-              autoComplete="given-name"
-              maxLength={100}
-              value={userName}
-              onChange={(event) => setUserName(event.target.value)}
-            />
-          </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="field-label">Seu nome (Responsável)</span>
+              <input
+                className="field text-base"
+                type="text"
+                placeholder="Ex: Marina Santos"
+                autoComplete="given-name"
+                maxLength={100}
+                value={userName}
+                onChange={(event) => setUserName(event.target.value)}
+              />
+            </label>
 
-          <label className="block">
-            <span className="field-label">Segmento do negócio</span>
-            <select
-              className="field text-base"
-              value={niche}
-              onChange={(event) => setNiche(event.target.value)}
-            >
-              {NICHES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="block">
+              <span className="field-label">Nome do negócio / estabelecimento</span>
+              <input
+                className="field text-base"
+                type="text"
+                placeholder="Ex: Panificadora Central"
+                maxLength={100}
+                value={businessName}
+                onChange={(event) => setBusinessName(event.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="field-label">Segmento do negócio</span>
+              <select
+                className="field text-base"
+                value={niche}
+                onChange={(event) => handleNicheChange(event.target.value)}
+              >
+                {SEGMENT_CATEGORIES.map((cat) => (
+                  <optgroup key={cat.category} label={`${cat.icon} ${cat.category}`}>
+                    {cat.options.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <span className="mt-1 block text-[11px] text-muted">
+                💡 A escolha do segmento calibra automaticamente os horários de funcionamento, pico e os produtos de referência do Cold Start.
+              </span>
+            </label>
+
+            {niche === "Outro" && (
+              <label className="block sm:col-span-2">
+                <span className="field-label text-[#d6ff00]">Especifique seu segmento</span>
+                <input
+                  className="field text-base"
+                  type="text"
+                  placeholder="Ex: Farmácia, Pet Shop, Barbearia, Floricultura"
+                  maxLength={100}
+                  value={customNiche}
+                  onChange={(e) => setCustomNiche(e.target.value)}
+                  required
+                />
+              </label>
+            )}
+
+            <label className="block">
+              <span className="field-label">Bairro no Recife</span>
+              <select
+                className="field text-base"
+                value={bairro}
+                onChange={(event) => setBairro(event.target.value)}
+              >
+                {RECIFE_BAIRROS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <button
             type="button"
@@ -185,8 +288,7 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
             <p className="eyebrow">Passo 2 de 3</p>
             <h2 className="section-title">Horários de funcionamento</h2>
             <p className="mt-1 text-xs text-muted">
-              Informe os dias e horários em que o seu estabelecimento está
-              aberto.
+              Informe os dias e horários em que o seu estabelecimento está aberto no Recife.
             </p>
           </div>
 
@@ -274,13 +376,30 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
       )}
 
       {step === 3 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <p className="eyebrow">Passo 3 de 3</p>
+            <div className="flex items-center gap-2">
+              <p className="eyebrow">Passo 3 de 3</p>
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-zinc-300">
+                Opcional
+              </span>
+            </div>
             <h2 className="section-title">Ticket médio estimado</h2>
             <p className="mt-1 text-xs text-muted">
               Qual é o valor médio gasto por cada cliente em cada compra?
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-zinc-300">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 text-base">💡</span>
+              <div className="space-y-1">
+                <p className="font-semibold text-white">Não tem esse valor agora?</p>
+                <p className="text-muted leading-relaxed">
+                  Não se preocupe! Você pode <strong>pular esta etapa</strong> agora e preencher o ticket médio mais tarde nas configurações da sua conta, ou quando tiver histórico de vendas.
+                </p>
+              </div>
+            </div>
           </div>
 
           <label className="block">
@@ -291,14 +410,14 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
               inputMode="decimal"
               min="0.01"
               step="0.01"
-              placeholder="Ex: 45,00"
+              placeholder="Ex: 45,00 (ou deixe em branco para pular)"
               value={averageTicket}
               onKeyDown={handleTicketKeyDown}
               onChange={(event) => setAverageTicket(event.target.value)}
             />
           </label>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -307,14 +426,26 @@ export function OnboardingWizard({ onSubmit }: OnboardingWizardProps) {
             >
               Voltar
             </button>
-            <button
-              type="button"
-              disabled={loading || !(ticketValue > 0)}
-              onClick={handleFinish}
-              className="primary-button w-2/3"
-            >
-              {loading ? "Concluindo..." : "Finalizar onboarding"}
-            </button>
+
+            <div className="flex flex-1 flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleFinish(true)}
+                className="rounded-xl border border-white/15 bg-white/[0.05] px-4 py-3 text-center text-sm font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+              >
+                Pular etapa (definir depois)
+              </button>
+
+              <button
+                type="button"
+                disabled={loading || !(ticketValue > 0)}
+                onClick={() => handleFinish(false)}
+                className="primary-button"
+              >
+                {loading ? "Concluindo..." : "Salvar e finalizar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

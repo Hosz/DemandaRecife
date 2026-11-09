@@ -25,11 +25,7 @@ public class TenantOnboardingValidator {
             throw new BadRequestException("O nicho de atuação é obrigatório para o cálculo de Cold Start.");
         }
 
-        if (request.averageTicket() == null) {
-            throw new BadRequestException("O ticket médio estimado é obrigatório.");
-        }
-
-        if (request.averageTicket().compareTo(BigDecimal.ZERO) < 0) {
+        if (request.averageTicket() != null && request.averageTicket().compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("O ticket médio não pode ser negativo.");
         }
 

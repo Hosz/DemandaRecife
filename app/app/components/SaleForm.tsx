@@ -13,7 +13,8 @@ export type Product = {
 };
 
 export type SaleFormData = {
-  productId: string;
+  productId?: string;
+  productName?: string;
   quantity: number;
   totalValue: number;
   soldAt: string;
@@ -45,6 +46,8 @@ function getNowOnServer() {
 
 export function SaleForm({ products, onSubmit }: SaleFormProps) {
   const [productId, setProductId] = useState("");
+  const [isCustomProduct, setIsCustomProduct] = useState(false);
+  const [customProductName, setCustomProductName] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [totalValue, setTotalValue] = useState("");
   const [editedSoldAt, setEditedSoldAt] = useState<string | null>(null);
@@ -67,13 +70,16 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSending || !soldAt) return;
+    if (isCustomProduct && !customProductName.trim()) return;
+    if (!isCustomProduct && !productId) return;
 
     setIsSending(true);
 
     let success = false;
     try {
       success = await onSubmit({
-        productId,
+        productId: isCustomProduct ? undefined : productId,
+        productName: isCustomProduct ? customProductName.trim() : undefined,
         quantity: Number(quantity),
         totalValue: Number(totalValue.replace(",", ".")),
         soldAt: new Date(soldAt).toISOString(),
@@ -85,6 +91,8 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
 
     if (success) {
       setProductId("");
+      setIsCustomProduct(false);
+      setCustomProductName("");
       setQuantity("1");
       setTotalValue("");
       setEditedSoldAt(null);
@@ -94,25 +102,67 @@ export function SaleForm({ products, onSubmit }: SaleFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-      <label className="block sm:col-span-2">
-        <span className="field-label">Produto ou serviço</span>
-        <select
-          className="field text-base"
-          value={productId}
-          onChange={(event) => setProductId(event.target.value)}
-          disabled={isSending}
-          required
-        >
-          <option value="" disabled>
-            Selecione um produto
-          </option>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name}
+      <div className="sm:col-span-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="field-label mb-0">Produto ou serviço</span>
+          <button
+            type="button"
+            onClick={() => {
+              setIsCustomProduct(!isCustomProduct);
+              setProductId("");
+              setCustomProductName("");
+            }}
+            className="text-xs text-[#d6ff00] hover:underline"
+          >
+            {isCustomProduct ? "← Escolher da lista" : "+ Digitar novo produto próprio"}
+          </button>
+        </div>
+
+        {isCustomProduct ? (
+          <div>
+            <input
+              type="text"
+              className="field text-base"
+              placeholder="Ex: Bolo de Rolo Tradicional 500g"
+              maxLength={120}
+              value={customProductName}
+              onChange={(e) => setCustomProductName(e.target.value)}
+              disabled={isSending}
+              required
+            />
+            <p className="mt-1 text-[11px] text-zinc-400">
+              O produto será cadastrado automaticamente no seu catálogo com o valor informado.
+            </p>
+          </div>
+        ) : (
+          <select
+            className="field text-base"
+            value={productId}
+            onChange={(event) => {
+              if (event.target.value === "__NEW__") {
+                setIsCustomProduct(true);
+                setProductId("");
+              } else {
+                setProductId(event.target.value);
+              }
+            }}
+            disabled={isSending}
+            required
+          >
+            <option value="" disabled>
+              Selecione um produto
             </option>
-          ))}
-        </select>
-      </label>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+            <option value="__NEW__" className="text-[#d6ff00] font-semibold">
+              + Digitar outro produto próprio...
+            </option>
+          </select>
+        )}
+      </div>
 
       <label className="block">
         <span className="field-label">Quantidade</span>

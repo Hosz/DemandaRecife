@@ -1,5 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-import { withAuth } from "./auth";
+import { withAuth, redirectToLogin } from "./auth";
 
 export type DailyBriefingData = {
   updatedAt?: string;
@@ -17,6 +17,7 @@ export type DailyBriefingData = {
     stockAlertsCount: number;
     modelAccuracy: string;
     accuracyDiff: string;
+    isRegionalEstimate?: boolean;
   };
   customerFlow?: { hour: string; value: number; highlight?: boolean }[];
   alerts?: { id: string; badge: string; title: string; description: string }[];
@@ -34,6 +35,26 @@ export type DailyBriefingData = {
     impacto?: string;
   };
 };
+
+export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/dashboard/daily-briefing`,
+      withAuth({ cache: "no-store" }),
+    );
+
+    if (response.status === 401) {
+      redirectToLogin();
+      return null;
+    }
+
+    if (!response.ok) return null;
+
+    return (await response.json()) as DailyBriefingData;
+  } catch {
+    return null;
+  }
+}
 
 export const EXAMPLE_BRIEFING: DailyBriefingData = {
   weather: {
@@ -112,24 +133,3 @@ export const EXAMPLE_BRIEFING: DailyBriefingData = {
       "Ofereça até 18% de desconto nos iogurtes e preserve uma margem positiva de 12%.",
   },
 };
-
-export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
-  const ENABLE_BACKEND_DASHBOARD = false;
-
-  if (!ENABLE_BACKEND_DASHBOARD) {
-    return EXAMPLE_BRIEFING;
-  }
-
-  try {
-    const response = await fetch(
-      `${API_URL}/api/dashboard/daily-briefing`,
-      withAuth({ cache: "no-store" }),
-    );
-
-    if (!response.ok) return null;
-
-    return (await response.json()) as DailyBriefingData;
-  } catch {
-    return null;
-  }
-}
