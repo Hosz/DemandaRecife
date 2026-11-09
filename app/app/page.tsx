@@ -353,6 +353,7 @@ export default function InicioPage() {
 
       {status === "ready" && data && (
         <>
+          {/* Card Clima e Data */}
           {data.weather && (
             <div className="mb-4 inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3">
               <span className="text-acid">{sunIcon}</span>
@@ -367,6 +368,38 @@ export default function InicioPage() {
             </div>
           )}
 
+          {/* ITEM 1 & 2 DO RF09: Componente Visual de "Dica da Inteligência Artificial" com Sparkles */}
+          {data.aiInsight && (
+            <section className="mb-6 overflow-hidden rounded-2xl border border-acid/25 bg-gradient-to-r from-acid/[0.08] via-white/[0.03] to-white/[0.01] p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3.5">
+                  <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-acid text-ink shadow-sm">
+                    <Icon size={18}>{sparklesPaths}</Icon>
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-acid">
+                        Inteligência Artificial
+                      </span>
+                      {data.aiInsight.impacto && (
+                        <span className="rounded-full bg-acid/15 px-2 py-0.5 text-[10px] font-semibold text-acid">
+                          {data.aiInsight.impacto}
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="mt-0.5 text-base font-bold text-white">
+                      {data.aiInsight.title}
+                    </h2>
+                    <p className="mt-2 text-xs sm:text-sm leading-relaxed text-white/80">
+                      {data.aiInsight.text}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Métricas Principais */}
           {data.metrics && (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
@@ -400,6 +433,7 @@ export default function InicioPage() {
             </div>
           )}
 
+          {/* Grid de Fluxo, Alertas de Estoque e Reposição */}
           <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
             <section className="panel">
               <SectionHeading
@@ -451,6 +485,7 @@ export default function InicioPage() {
               )}
             </section>
 
+            {/* ITEM 3 DO RF09: Mantém os alertas de estoque / atenção imediata */}
             <section className="panel">
               <SectionHeading
                 eyebrow="Atenção imediata"
