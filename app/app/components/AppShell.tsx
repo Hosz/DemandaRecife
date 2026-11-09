@@ -160,7 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [menuOpen]);
 
-    useEffect(() => {
+  useEffect(() => {
     const noop = () => {};
     document.addEventListener("touchstart", noop, { passive: true });
     return () => document.removeEventListener("touchstart", noop);
@@ -169,10 +169,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const onMainTab = MAIN_TABS.some((tab) => isActive(pathname, tab.href));
   const maisActive = menuOpen || !onMainTab;
 
-    if (pathname.startsWith("/onboarding")) {
+  if (pathname.startsWith("/onboarding")) {
     return <>{children}</>;
   }
-  
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/95 pt-[env(safe-area-inset-top)] backdrop-blur">
@@ -242,7 +242,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <div className="flex flex-1 flex-col">{children}</div>
+      {/* Container principal com compensação para a Bottom Navigation no mobile */}
+      <div className="flex flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-8">
+        {children}
+      </div>
 
       <nav
         aria-label="Navegação principal"
