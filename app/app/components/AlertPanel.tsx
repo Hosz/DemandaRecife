@@ -2,17 +2,28 @@ export function AlertPanel() {
   return (
     <section
       role="status"
-      className="flex items-start gap-3 rounded-3xl border border-amber-400/30 bg-amber-500/10 p-5 sm:p-6"
+      className="space-y-4 rounded-3xl bg-[#D4FF00] p-5 text-black sm:p-6 shadow-lg"
     >
-      <span aria-hidden="true" className="text-xl leading-none">
-        ⚠️
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-base">✨</span>
+        <span className="text-xs font-bold uppercase tracking-wider">
+          Recomendação da IA
+        </span>
+      </div>
+
       <div>
-        <p className="font-semibold text-amber-300">Atenção</p>
-        <p className="mt-1 text-sm text-white">
-          Movimento acima do normal na Sexta às 19h - Considere reforçar o caixa.
+        <h3 className="text-lg font-bold">Ajuste prioritário</h3>
+        <p className="mt-1 text-sm font-medium leading-relaxed">
+          <strong>Reforce o fechamento:</strong> Adicione 1 pessoa entre 17h e 21h. O fluxo previsto é 32% maior que a média.
         </p>
       </div>
+
+      <button
+        type="button"
+        className="w-full rounded-2xl bg-black py-3.5 text-center text-sm font-bold text-[#D4FF00] transition-transform active:scale-98 hover:bg-zinc-900"
+      >
+        Aplicar escala sugerida
+      </button>
     </section>
   );
 }
