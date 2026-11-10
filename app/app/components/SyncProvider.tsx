@@ -1,16 +1,31 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { registerServiceWorker } from "../lib/push";
 import { processSyncQueue } from "../lib/offline-db";
 
+function subscribeOnline(callback: () => void) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+
+function getOnlineSnapshot() {
+  return navigator.onLine;
+}
+
+function getOnlineServerSnapshot() {
+  return true;
+}
+
 export function SyncProvider({ children }: { children: ReactNode }) {
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getOnlineServerSnapshot);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsOnline(navigator.onLine);
-
     // Registra Service Worker
     void registerServiceWorker();
 
@@ -20,7 +35,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
 
     const handleOnline = async () => {
-      setIsOnline(true);
       setSyncStatus("Conexão restabelecida. Sincronizando dados...");
       const result = await processSyncQueue();
       if (result.sincronizados > 0) {
@@ -32,7 +46,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     };
 
     const handleOffline = () => {
-      setIsOnline(false);
       setSyncStatus("Modo offline ativo. Os dados serão salvos localmente.");
     };
 

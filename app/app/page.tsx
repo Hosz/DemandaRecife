@@ -14,6 +14,7 @@ import {
   fetchDailyBriefing,
   type DailyBriefingData,
 } from "./lib/dashboard";
+import { getAccessToken, getTenantId } from "./lib/auth";
 
 const USE_EXAMPLE_DATA_ON_ERROR = true;
 
@@ -270,9 +271,16 @@ export default function InicioPage() {
   );
 
   useEffect(() => {
-    if (userName === undefined) return;
+    if (typeof window === "undefined") return;
 
-    if (userName === null) {
+    const token = getAccessToken();
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    const tenantId = getTenantId();
+    if (!tenantId) {
       router.replace("/onboarding");
       return;
     }
@@ -376,6 +384,60 @@ export default function InicioPage() {
             </div>
           )}
 
+          {/* Aviso Explícito de Dados Estimados (Cold Start Regional) */}
+          {data.metrics?.isRegionalEstimate && (
+            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-500/20 text-amber-300 text-lg">
+                  ⚠️
+                </span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-bold text-amber-300">
+                      Modo de Estimativa Regional (Recife & PE) Ativo
+                    </h3>
+                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
+                      Poucos dados de vendas
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-amber-200/80 leading-relaxed max-w-3xl">
+                    Seu estabelecimento ainda possui poucas vendas cadastradas. O sistema está projetando horários de pico, fluxo e sugestões com base nos <strong>benchmarks estatísticos de comércio em Pernambuco</strong>. À medida que você registrar vendas manuais ou importar planilhas, a IA calibrará os números automaticamente para o histórico real da sua loja.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dados"
+                className="whitespace-nowrap rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-bold text-black transition hover:brightness-105 active:scale-[0.99]"
+              >
+                Alimentar vendas reais →
+              </Link>
+            </div>
+          )}
+
+          {data.metrics?.peakHour === "Aguardando dados" && (
+            <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-500/20 text-blue-300 text-lg">
+                  ℹ️
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-blue-300">
+                    Aguardando Vendas Reais do Estabelecimento
+                  </h3>
+                  <p className="mt-1 text-xs text-blue-200/80 leading-relaxed max-w-3xl">
+                    A estimativa regional da vizinhança (Cold Start) está desativada nas suas configurações. O sistema não exibirá aproximações e aguardará o registro de vendas reais para calcular o pico de movimento e o fluxo da sua loja.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dados"
+                className="whitespace-nowrap rounded-xl bg-blue-400 px-4 py-2.5 text-xs font-bold text-black transition hover:brightness-105 active:scale-[0.99]"
+              >
+                Registrar vendas →
+              </Link>
+            </div>
+          )}
+
           {/* ITEM 1 & 2 DO RF09: Componente Visual de "Dica da Inteligência Artificial" com Sparkles */}
           {data.aiInsight && (
             <section className="mb-6 overflow-hidden rounded-2xl border border-acid/25 bg-gradient-to-r from-acid/[0.08] via-white/[0.03] to-white/[0.01] p-5 sm:p-6 shadow-sm">
@@ -419,10 +481,10 @@ export default function InicioPage() {
               />
               <MetricCard
                 icon={usersIcon}
-                badge="Alta"
+                badge={data.metrics.isRegionalEstimate ? "Regional (PE)" : "Vendas Reais"}
                 label="Pico de movimento"
                 value={data.metrics.peakHour}
-                caption={data.metrics.peakRange}
+                caption={data.metrics.isRegionalEstimate ? `${data.metrics.peakRange} (estimativa regional)` : data.metrics.peakRange}
               />
               <MetricCard
                 icon={boxIcon}
@@ -444,10 +506,21 @@ export default function InicioPage() {
           {/* Grid de Fluxo, Alertas de Estoque e Reposição */}
           <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
             <section className="panel">
-              <SectionHeading
-                eyebrow="Previsão de hoje"
-                title="Fluxo de clientes"
-              />
+              <div className="flex items-start justify-between">
+                <SectionHeading
+                  eyebrow="Previsão de hoje"
+                  title="Fluxo de clientes"
+                />
+                {data.metrics?.isRegionalEstimate ? (
+                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-muted">
+                    Estimativa regional PE
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-acid/15 px-2.5 py-0.5 text-[10px] font-bold text-acid">
+                    Vendas reais
+                  </span>
+                )}
+              </div>
 
               {flow.length > 0 ? (
                 <>

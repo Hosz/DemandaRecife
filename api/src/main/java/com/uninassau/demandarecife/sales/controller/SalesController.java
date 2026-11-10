@@ -29,7 +29,16 @@ public class SalesController {
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ImportResult upload(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) throw new IllegalArgumentException("Arquivo vazio");
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo vazio");
+        }
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("O arquivo excede o limite máximo permitido de 10MB");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename != null && (filename.contains("..") || filename.contains("/") || filename.contains("\\"))) {
+            throw new IllegalArgumentException("Nome de arquivo inválido ou inseguro");
+        }
         return salesService.importFile(currentTenant.id(), file);
     }
 }

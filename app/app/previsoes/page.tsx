@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getAccessToken, clearAuthSession } from "../lib/auth";
+import { DashboardSkeleton } from "../components/DashboardSkeleton";
+import { fetchIntegrationsStatus, type IntegrationsStatus } from "../lib/api";
 
 type ForecastItem = {
   productId: string;
@@ -242,82 +246,110 @@ function DemandChart({ data }: { data: ForecastItem[] }) {
 }
 
 export default function PrevisoesPage() {
+  const router = useRouter();
   const [period, setPeriod] = useState<Period>("week");
   const [forecasts, setForecasts] = useState<ForecastItem[]>([]);
+  const [integrations, setIntegrations] = useState<IntegrationsStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadIndex, setReloadIndex] = useState(0);
   const [today, setToday] = useState<Date | null>(null);
 
-  const loadForecasts = useCallback(async () => {
+  const handleReload = () => {
     setLoading(true);
     setError("");
-
-    try {
-      if (typeof window === "undefined") return;
-      const token = localStorage.getItem("access_token");
-
-      // Se não há token, não inventa dados nem exibe erro: deixa a lista limpa
-      if (!token) {
-        setForecasts([]);
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/api/forecast`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        setForecasts([]);
-        setLoading(false);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          response.status === 404
-            ? "O endpoint de previsões (/api/forecast) não foi encontrado no backend."
-            : `Não foi possível carregar as previsões. Erro HTTP ${response.status}.`,
-        );
-      }
-
-      const result: unknown = await response.json();
-
-      if (!Array.isArray(result)) {
-        setForecasts([]);
-        setLoading(false);
-        return;
-      }
-
-      const normalized = result
-        .map((item) =>
-          item && typeof item === "object"
-            ? normalizeForecast(item as Record<string, unknown>)
-            : null,
-        )
-        .filter(
-          (item): item is ForecastItem => item !== null,
-        );
-
-      setForecasts(normalized);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro inesperado ao carregar previsões.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setReloadIndex((i) => i + 1);
+  };
 
   useEffect(() => {
-    setToday(startOfDay(new Date()));
+    let ignore = false;
+
+    async function loadForecasts() {
+      try {
+        if (typeof window === "undefined") return;
+        const token = getAccessToken();
+
+        const response = await fetch(`${API_URL}/api/forecast`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (ignore) return;
+
+        if (response.status === 401) {
+          clearAuthSession();
+          router.replace("/login");
+          setError("Sessão expirada ou não autenticada (401). Redirecionando para login...");
+          return;
+        }
+
+        if (response.status === 403) {
+          setError("Acesso não autorizado ao recurso de previsões (403).");
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            response.status === 404
+              ? "O endpoint de previsões (/api/forecast) não foi encontrado no backend."
+              : `Não foi possível carregar as previsões. Erro HTTP ${response.status}.`,
+          );
+        }
+
+        const result: unknown = await response.json();
+
+        if (!Array.isArray(result)) {
+          throw new Error(
+            "A resposta da API está em um formato inesperado (não é uma lista).",
+          );
+        }
+
+        const normalized = result
+          .map((item) =>
+            item && typeof item === "object"
+              ? normalizeForecast(item as Record<string, unknown>)
+              : null,
+          )
+          .filter(
+            (item): item is ForecastItem => item !== null,
+          );
+
+        const statusData = await fetchIntegrationsStatus();
+        if (!ignore && statusData) {
+          setIntegrations(statusData);
+        }
+
+        setToday(startOfDay(new Date()));
+        setForecasts(normalized);
+
+        if (normalized.length === 0 && result.length > 0) {
+          setError(
+            "A API retornou dados, mas nenhum registro corresponde ao formato esperado.",
+          );
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Erro inesperado ao carregar previsões.",
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
     void loadForecasts();
-  }, [loadForecasts]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [reloadIndex, router]);
 
   const filteredForecasts = useMemo(() => {
     if (!today) return [];
@@ -381,7 +413,7 @@ export default function PrevisoesPage() {
 
           <button
             type="button"
-            onClick={loadForecasts}
+            onClick={handleReload}
             disabled={loading}
             className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-xs font-semibold text-white transition hover:bg-white/10 disabled:opacity-50"
           >
@@ -428,7 +460,7 @@ export default function PrevisoesPage() {
             <p className="text-sm text-red-300">{error}</p>
             <button
               type="button"
-              onClick={loadForecasts}
+              onClick={handleReload}
               className="text-xs font-bold text-white underline"
             >
               Tentar novamente
@@ -436,7 +468,11 @@ export default function PrevisoesPage() {
           </div>
         )}
 
-        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {loading && forecasts.length === 0 ? (
+          <DashboardSkeleton />
+        ) : (
+          <>
+            <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Quantidade prevista"
             value={loading ? "—" : formatNumber(totalQuantity)}
@@ -486,56 +522,71 @@ export default function PrevisoesPage() {
             </p>
 
             <div className="mt-6 space-y-4">
-              {[
-                {
-                  title: "Histórico de vendas",
-                  description: "Base utilizada pelo motor preditivo.",
-                  status: "Disponível",
-                  active: true,
-                },
-                {
-                  title: "Clima",
-                  description: "Dados meteorológicos não integrados.",
-                  status: "Indisponível",
-                  active: false,
-                },
-                {
-                  title: "Eventos especiais",
-                  description: "Calendário de eventos não integrado.",
-                  status: "Indisponível",
-                  active: false,
-                },
-                {
-                  title: "Horário de pico",
-                  description: "A API não fornece previsão por hora.",
-                  status: "Indisponível",
-                  active: false,
-                },
-              ].map((item) => (
-                <div
-                  key={item.title}
-                  className="flex items-start justify-between gap-3 border-b border-white/10 pb-4 last:border-0 last:pb-0"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted">
-                      {item.description}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold ${
-                      item.active
-                        ? "bg-acid/10 text-acid"
-                        : "bg-white/5 text-muted"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                <div>
+                  <p className="text-sm font-semibold text-white">Histórico de vendas</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    Base contínua utilizada pelo motor preditivo de demanda.
+                  </p>
                 </div>
-              ))}
+                <span className="shrink-0 rounded-full bg-acid/10 px-2.5 py-1 text-[9px] font-bold text-acid">
+                  Disponível
+                </span>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-white">Clima e temperatura</p>
+                    {integrations?.climaAtual && (
+                      <span className="text-xs text-acid">
+                        {integrations.climaAtual.temp} · {integrations.climaAtual.condition}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    {integrations?.climaAtual
+                      ? `Previsão meteorológica para ${integrations.climaAtual.location} integrada aos cálculos.`
+                      : "Dados meteorológicos do Recife integrados aos cálculos."}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-acid/10 px-2.5 py-1 text-[9px] font-bold text-acid">
+                  Disponível
+                </span>
+              </div>
+
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                <div>
+                  <p className="text-sm font-semibold text-white">Eventos especiais e feriados</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    {integrations?.proximosEventos && integrations.proximosEventos.length > 0
+                      ? `Próximo evento em PE: ${integrations.proximosEventos[0].nome} (${integrations.proximosEventos[0].data}).`
+                      : "Calendário regional de feriados e datas comemorativas de Recife/PE integrado."}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-acid/10 px-2.5 py-1 text-[9px] font-bold text-acid">
+                  Disponível
+                </span>
+              </div>
+
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-white">Horário de pico</p>
+                    {integrations?.horarioPico && (
+                      <span className="text-xs text-acid">
+                        Pico {integrations.horarioPico} ({integrations.faixaPico})
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    Curva horária de movimento calculada para dimensionamento de equipe e compras.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-acid/10 px-2.5 py-1 text-[9px] font-bold text-acid">
+                  Disponível
+                </span>
+              </div>
             </div>
           </article>
         </section>
@@ -560,13 +611,21 @@ export default function PrevisoesPage() {
               Carregando dados...
             </div>
           ) : filteredForecasts.length === 0 ? (
-            <div className="p-10 text-center">
-              <p className="text-sm font-semibold text-white">
-                Nenhuma previsão encontrada
+            <div className="p-8 sm:p-12 text-center">
+              <span className="text-3xl">📊</span>
+              <p className="mt-3 text-base font-bold text-white">
+                Aguardando histórico de vendas para calibrar previsões
               </p>
-              <p className="mt-2 text-xs text-muted">
-                Não existem previsões disponíveis para o período selecionado.
+              <p className="mt-1.5 text-xs text-amber-200/80 max-w-md mx-auto leading-relaxed">
+                O motor preditivo precisa de registros de vendas para calcular médias móveis, tendências e sazonalidade. Conforme você alimentar a Central de Dados, as previsões deste período serão calculadas automaticamente.
               </p>
+              <button
+                type="button"
+                onClick={() => router.push("/dados")}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-acid px-4 py-2 text-xs font-bold text-ink hover:brightness-105 transition"
+              >
+                Alimentar vendas na Central de Dados →
+              </button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -625,6 +684,8 @@ export default function PrevisoesPage() {
             </p>
           </div>
         </section>
+        </>
+        )}
       </div>
     </main>
   );

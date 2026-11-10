@@ -26,12 +26,15 @@ public class TenantProfileMapper {
                 ? String.join(",", request.businessDays())
                 : null;
 
+        Boolean usarBenchmarks = request.usarBenchmarksColdStart() != null ? request.usarBenchmarksColdStart() : Boolean.TRUE;
+
         return TenantProfile.builder()
                 .tenant(tenant)
                 .responsavelNome(request.userName() != null ? request.userName().trim() : null)
                 .horarioAbertura(opening)
                 .horarioFechamento(closing)
                 .diasFuncionamento(diasStr)
+                .usarBenchmarksColdStart(usarBenchmarks)
                 .build();
     }
 
@@ -53,7 +56,8 @@ public class TenantProfileMapper {
                 profile.getResponsavelNome(),
                 profile.getHorarioAbertura(),
                 profile.getHorarioFechamento(),
-                dias
+                dias,
+                profile.getUsarBenchmarksColdStart() != null ? profile.getUsarBenchmarksColdStart() : Boolean.TRUE
         );
     }
 }

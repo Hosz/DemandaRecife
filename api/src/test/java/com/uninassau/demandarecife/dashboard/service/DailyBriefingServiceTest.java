@@ -1,6 +1,7 @@
 package com.uninassau.demandarecife.dashboard.service;
 
 import com.uninassau.demandarecife.alerts.service.AlertService;
+import com.uninassau.demandarecife.external.finder.WeatherFinder;
 import com.uninassau.demandarecife.forecast.dto.ForecastResult;
 import com.uninassau.demandarecife.forecast.dto.ForecastResult.Metodo;
 import com.uninassau.demandarecife.forecast.service.DemandForecastService;
@@ -8,6 +9,8 @@ import com.uninassau.demandarecife.products.entity.Product;
 import com.uninassau.demandarecife.products.repository.ProductRepository;
 import com.uninassau.demandarecife.replenishment.dto.ReplenishmentSuggestion;
 import com.uninassau.demandarecife.replenishment.service.ReplenishmentService;
+import com.uninassau.demandarecife.sales.repository.SalesRepository;
+import com.uninassau.demandarecife.tenants.finder.TenantFinder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,13 +38,16 @@ class DailyBriefingServiceTest {
     @Mock ReplenishmentService replenishmentService;
     @Mock DemandForecastService forecastService;
     @Mock ProductRepository productRepository;
+    @Mock WeatherFinder weatherFinder;
+    @Mock TenantFinder tenantFinder;
+    @Mock SalesRepository salesRepository;
 
     DailyBriefingService service;
     Product pao;
 
     @BeforeEach
     void setUp() {
-        service = new DailyBriefingService(alertService, replenishmentService, forecastService, productRepository);
+        service = new DailyBriefingService(alertService, replenishmentService, forecastService, productRepository, weatherFinder, tenantFinder, salesRepository);
         pao = new Product();
         pao.setId(UUID.randomUUID());
         pao.setNome("Pão Francês");
@@ -49,6 +55,7 @@ class DailyBriefingServiceTest {
         lenient().when(alertService.listar(TENANT, "ATIVO", false)).thenReturn(List.of());
         lenient().when(replenishmentService.suggestions(TENANT)).thenReturn(List.of());
         lenient().when(forecastService.forecast(eq(TENANT), any())).thenReturn(List.of());
+        lenient().when(salesRepository.countSalesByHour(TENANT)).thenReturn(List.of());
     }
 
     private ForecastResult previsao(UUID id, double qtd, Metodo metodo) {
@@ -72,6 +79,7 @@ class DailyBriefingServiceTest {
         assertThat(r.compras()).hasSize(1);
         assertThat(r.previsaoVendas()).singleElement()
                 .satisfies(p -> assertThat(p.produto()).isEqualTo("Pão Francês"));
+        assertThat(r.metrics().isRegionalEstimate()).isTrue();
     }
 
     @Test
