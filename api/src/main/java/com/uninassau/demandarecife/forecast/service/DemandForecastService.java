@@ -38,7 +38,11 @@ public class DemandForecastService {
     private final ProductRepository productRepository;
     private final BenchmarkProvider benchmarkProvider;
 
-    private record Ctx(String nicho, OperatingDays dias, LocalDate hoje, LocalDate alvo) {}
+    private record Ctx(String nicho, OperatingDays dias, LocalDate hoje, LocalDate alvo, boolean usarBenchmarks) {
+        Ctx(String nicho, OperatingDays dias, LocalDate hoje, LocalDate alvo) {
+            this(nicho, dias, hoje, alvo, true);
+        }
+    }
 
     /** Previsão de todos os produtos do tenant para a data (null = hoje). */
     @Transactional(readOnly = true)
@@ -50,7 +54,8 @@ public class DemandForecastService {
     // "hoje" como parâmetro: permite testar com datas fixas
     List<ForecastResult> forecast(UUID tenantId, LocalDate dataAlvo, LocalDate hoje) {
         var settings = forecastRepository.configuracoes(tenantId);
-        var ctx = new Ctx(settings.nicho(), OperatingDays.parse(settings.diasFuncionamento()), hoje, dataAlvo);
+        boolean usarBenchmarks = settings.usarBenchmarksColdStart() == null || settings.usarBenchmarksColdStart();
+        var ctx = new Ctx(settings.nicho(), OperatingDays.parse(settings.diasFuncionamento()), hoje, dataAlvo, usarBenchmarks);
 
         var vendas = forecastRepository.vendasPorDia(tenantId, hoje.minusDays(JANELA_MAX), hoje);
         var primeiras = forecastRepository.primeiraVenda(tenantId);
@@ -93,9 +98,11 @@ public class DemandForecastService {
 
     private ForecastResult coldStart(Product p, Ctx ctx, Map<LocalDate, Integer> vendas,
                                      LocalDate primeiraVenda, long diasHistorico) {
-        Optional<BigDecimal> benchmark = benchmarkProvider.mediaDiaria(ctx.nicho(), p.getNome());
-        if (benchmark.isPresent()) {
-            return resultado(p, ctx, benchmark.get(), Metodo.BENCHMARK);
+        if (ctx.usarBenchmarks()) {
+            Optional<BigDecimal> benchmark = benchmarkProvider.mediaDiaria(ctx.nicho(), p.getNome());
+            if (benchmark.isPresent()) {
+                return resultado(p, ctx, benchmark.get(), Metodo.BENCHMARK);
+            }
         }
         if (diasHistorico >= 1) {   // sem benchmark: melhor o pouco que existe do que zero
             BigDecimal media = MovingAverage.calculate(vendas, primeiraVenda, ctx.hoje(), 7, ctx.dias());
@@ -118,6 +125,8 @@ public class DemandForecastService {
         var vendas = forecastRepository.vendasPorDia(tenantId, hoje.minusDays(JANELA_MAX), hoje);
         var primeiras = forecastRepository.primeiraVenda(tenantId);
 
+        boolean usarBenchmarks = settings.usarBenchmarksColdStart() == null || settings.usarBenchmarksColdStart();
+
         Map<UUID, List<ForecastResult>> resultado = new LinkedHashMap<>();
         for (Product p : productRepository.findByTenantId(tenantId)) {
             var vendasDoProduto = vendas.getOrDefault(p.getId(), Map.of());
@@ -125,7 +134,7 @@ public class DemandForecastService {
 
             List<ForecastResult> lista = new ArrayList<>();
             for (int i = 0; i < dias; i++) {
-                var ctx = new Ctx(settings.nicho(), diasAbertos, hoje, inicio.plusDays(i));
+                var ctx = new Ctx(settings.nicho(), diasAbertos, hoje, inicio.plusDays(i), usarBenchmarks);
                 lista.add(forecastProduct(p, ctx, vendasDoProduto, primeiraVenda));
             }
             resultado.put(p.getId(), lista);

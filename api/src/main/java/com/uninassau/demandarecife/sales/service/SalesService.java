@@ -43,13 +43,34 @@ public class SalesService {
 
     @Transactional
     public SaleTransaction create(UUID tenantId, SaleRequest req) {
-        // Isolamento (RNF04): o produto precisa ser do mesmo tenant
-        if (!productRepository.existsByIdAndTenantId(req.productId(), tenantId)) {
+        UUID prodId = req.productId();
+        if (prodId == null && req.productName() != null && !req.productName().isBlank()) {
+            String nome = req.productName().trim();
+            // Verifica se o produto já existe pelo nome para este tenant
+            Optional<Product> existente = productRepository.findByTenantId(tenantId).stream()
+                    .filter(p -> p.getNome() != null && p.getNome().equalsIgnoreCase(nome))
+                    .findFirst();
+
+            if (existente.isPresent()) {
+                prodId = existente.get().getId();
+            } else {
+                // Cadastra automaticamente o novo produto no catálogo do estabelecimento (RF01/RF02)
+                Product novoProduto = new Product();
+                novoProduto.setTenantId(tenantId);
+                novoProduto.setNome(nome);
+                novoProduto.setPrecoVenda(req.precoUnitario());
+                novoProduto.setCustoUnidade(req.precoUnitario().multiply(new BigDecimal("0.60")));
+                Product savedProd = productRepository.save(novoProduto);
+                prodId = savedProd.getId();
+                inventoryService.garantirNivelEstoque(tenantId, prodId, 5, 2);
+            }
+        } else if (prodId != null && !productRepository.existsByIdAndTenantId(prodId, tenantId)) {
             throw new IllegalArgumentException("Produto não encontrado");
         }
+
         var sale = new SaleTransaction();
         sale.setTenantId(tenantId);
-        sale.setProductId(req.productId());
+        sale.setProductId(prodId);
         sale.setQuantidade(req.quantidade());
         sale.setPrecoUnitario(req.precoUnitario());
         sale.setDataHoraVenda(req.dataHoraVenda());

@@ -52,6 +52,10 @@ public class TenantProfile {
     @Column(name = "dias_funcionamento", length = 100)
     private String diasFuncionamento;
 
+    @Builder.Default
+    @Column(name = "usar_benchmarks_cold_start")
+    private Boolean usarBenchmarksColdStart = true;
+
     @Column(name = "atualizado_em")
     private Instant atualizadoEm;
 

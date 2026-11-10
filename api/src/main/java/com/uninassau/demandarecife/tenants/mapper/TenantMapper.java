@@ -60,4 +60,26 @@ public class TenantMapper {
                 tenant.getCriadoEm()
         );
     }
+
+    public static TenantResponseDto toResponseDto(Tenant tenant, TenantProfile profile,
+                                                  String accessToken, String refreshToken,
+                                                  String tokenType, Long expiresIn) {
+        TenantProfileDto profileDto = TenantProfileMapper.toDto(profile);
+
+        return new TenantResponseDto(
+                tenant.getId(),
+                tenant.getNome(),
+                tenant.getNichoAtuacao(),
+                tenant.getTicketMedio(),
+                tenant.getCidade(),
+                tenant.getEstado(),
+                tenant.getBairro(),
+                profileDto,
+                tenant.getCriadoEm(),
+                accessToken,
+                refreshToken,
+                tokenType,
+                expiresIn
+        );
+    }
 }

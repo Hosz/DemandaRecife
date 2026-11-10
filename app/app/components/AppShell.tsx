@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { requestAndSubscribePush } from "../lib/push";
 import { registrarVenda } from "../lib/sales-service";
+import { getUser, clearAuthSession, isAuthenticated, getTenantId } from "../lib/auth";
+import { DashboardSkeleton } from "./DashboardSkeleton";
 
 type NavItem = {
   href: string;
@@ -12,11 +14,11 @@ type NavItem = {
   icon: ReactNode;
 };
 
-function Icon({ children }: { children: ReactNode }) {
+function Icon({ children, size = 22 }: { children: ReactNode; size?: number }) {
   return (
     <svg
-      width="22"
-      height="22"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -122,6 +124,14 @@ const NOTIFICACOES_FIGMA = [
   "Promoção sugerida para iogurtes",
 ];
 
+const logoutIcon = (
+  <Icon size={18}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </Icon>
+);
+
 const MAIN_TABS: NavItem[] = [
   { href: "/", label: "Início", icon: homeIcon },
   { href: "/previsoes", label: "Previsões", icon: forecastIcon },
@@ -154,9 +164,53 @@ function tabClass(active: boolean) {
 const headerButtonClass =
   "relative grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white transition hover:bg-white/10";
 
+function subscribeToStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function getUserSnapshot() {
+  if (typeof window === "undefined") return "";
+  return `${localStorage.getItem("access_token") ?? ""}:${localStorage.getItem("tenant_id") ?? ""}:${localStorage.getItem("user_id") ?? ""}:${localStorage.getItem("user_name") ?? ""}:${localStorage.getItem("user_email") ?? ""}`;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const userSnapshot = useSyncExternalStore(
+    subscribeToStorage,
+    getUserSnapshot,
+    () => "",
+  );
+  const currentUser = useMemo(() => {
+    return userSnapshot ? getUser() : null;
+  }, [userSnapshot]);
+
+  const hasAccess = useMemo(() => {
+    if (!userSnapshot) return false;
+    const [token, tenantId] = userSnapshot.split(":");
+    return Boolean(token && tenantId && tenantId !== "null" && tenantId !== "undefined");
+  }, [userSnapshot]);
+
+  const isPublicRoute =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/cadastro") ||
+    pathname.startsWith("/registro") ||
+    pathname.startsWith("/onboarding");
+
+  useEffect(() => {
+    if (!isPublicRoute) {
+      if (!isAuthenticated()) {
+        router.replace("/login");
+        return;
+      }
+
+      if (!getTenantId()) {
+        router.replace("/onboarding");
+      }
+    }
+  }, [isPublicRoute, router]);
 
   // Estado do painel suspenso de Notificações (Figma)
   const [notifOpen, setNotifOpen] = useState(false);
@@ -247,8 +301,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const onMainTab = MAIN_TABS.some((tab) => isActive(pathname, tab.href));
   const maisActive = menuOpen || !onMainTab;
 
-  if (pathname.startsWith("/onboarding")) {
+  if (isPublicRoute) {
     return <>{children}</>;
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6 sm:pt-10">
+        <DashboardSkeleton />
+      </div>
+    );
+  }
+
+  function handleLogout() {
+    clearAuthSession();
+    setMenuOpen(false);
+    router.replace("/login");
   }
 
   return (
@@ -271,7 +339,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-label="Ir para o início"
             className="grid size-10 place-items-center rounded-xl bg-acid font-display text-lg font-bold text-ink"
           >
-            N
+            D
           </Link>
 
           <div className="relative flex items-center gap-2" ref={notifRef}>
@@ -373,6 +441,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             id="menu-principal"
             className="mx-auto w-full max-w-6xl px-4 pb-4 sm:px-6"
           >
+            {currentUser && (
+              <div className="mb-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-9 place-items-center rounded-xl bg-acid text-xs font-bold text-ink">
+                    {currentUser.nome ? currentUser.nome.charAt(0).toUpperCase() : "U"}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">{currentUser.nome || "Usuário"}</p>
+                    <p className="text-xs text-muted">{currentUser.email}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400"
+                >
+                  {logoutIcon}
+                  <span>Sair</span>
+                </button>
+              </div>
+            )}
+
             <ul className="grid grid-cols-2 gap-1 sm:grid-cols-4">
               {MENU_ITEMS.map((item) => {
                 const active = isActive(pathname, item.href);

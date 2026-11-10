@@ -37,4 +37,19 @@ public class InventoryService {
     public void baixar(UUID tenantId, Map<UUID, Integer> saidas) {
         saidas.forEach((productId, quantidade) -> repository.baixar(tenantId, productId, quantidade));
     }
+
+    /** Garante que um produto tenha registro de nível de estoque. */
+    @Transactional
+    public InventoryLevel garantirNivelEstoque(UUID tenantId, UUID productId, int estoqueMinimo, int tempoReposicaoDias) {
+        return repository.findByTenantIdAndProductId(tenantId, productId)
+                .orElseGet(() -> {
+                    InventoryLevel level = new InventoryLevel();
+                    level.setTenantId(tenantId);
+                    level.setProductId(productId);
+                    level.setQuantidadeAtual(0);
+                    level.setEstoqueMinimo(Math.max(1, estoqueMinimo));
+                    level.setTempoReposicaoDias(Math.max(1, tempoReposicaoDias));
+                    return repository.save(level);
+                });
+    }
 }

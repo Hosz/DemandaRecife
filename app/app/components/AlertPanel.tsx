@@ -1,4 +1,14 @@
-export function AlertPanel() {
+"use client";
+
+interface AlertPanelProps {
+  onApplySuggestion?: () => void;
+  isApplied?: boolean;
+}
+
+export function AlertPanel({
+  onApplySuggestion,
+  isApplied = false,
+}: AlertPanelProps) {
   return (
     <section
       role="status"
@@ -20,9 +30,11 @@ export function AlertPanel() {
 
       <button
         type="button"
-        className="w-full rounded-2xl bg-black py-3.5 text-center text-sm font-bold text-[#D4FF00] transition-transform active:scale-98 hover:bg-zinc-900"
+        disabled={isApplied}
+        onClick={onApplySuggestion}
+        className="w-full rounded-2xl bg-black py-3.5 text-center text-sm font-bold text-[#D4FF00] transition-transform active:scale-98 hover:bg-zinc-900 disabled:opacity-50"
       >
-        Aplicar escala sugerida
+        {isApplied ? "✓ Escala sugerida já aplicada" : "Aplicar escala sugerida"}
       </button>
     </section>
   );

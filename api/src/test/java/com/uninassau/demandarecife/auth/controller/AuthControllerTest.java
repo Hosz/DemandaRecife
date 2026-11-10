@@ -6,7 +6,9 @@ import com.uninassau.demandarecife.auth.dto.request.RefreshTokenRequest;
 import com.uninassau.demandarecife.auth.dto.request.RegistroRequest;
 import com.uninassau.demandarecife.auth.dto.response.LoginResponse;
 import com.uninassau.demandarecife.auth.dto.response.RegistroResponse;
+import com.uninassau.demandarecife.auth.dto.response.UsuarioResponse;
 import com.uninassau.demandarecife.auth.service.AuthService;
+import com.uninassau.demandarecife.shared.exception.ApiExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -22,6 +25,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,7 +44,10 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .build();
     }
 
     @Test
@@ -104,5 +111,12 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.refreshToken").value("novo_refresh"));
 
         verify(authService).refresh(any(RefreshTokenRequest.class));
+    }
+
+    @Test
+    void me_quandoSemToken_retornaStatusUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.erro").value("Usuário não autenticado."));
     }
 }
