@@ -10,15 +10,26 @@ import {
 } from "react";
 import { DashboardSkeleton } from "./components/DashboardSkeleton";
 import {
-  EXAMPLE_BRIEFING,
+  BRIEFING_LIST_LIMIT,
   fetchDailyBriefing,
+  type BriefingForecast,
   type DailyBriefingData,
 } from "./lib/dashboard";
-import { getAccessToken, getTenantId } from "./lib/auth";
 
-const USE_EXAMPLE_DATA_ON_ERROR = true;
+const quantityFormat = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 1,
+});
 
-type FlowPoint = NonNullable<DailyBriefingData["customerFlow"]>[number];
+const ALERT_LABELS: Record<string, string> = {
+  RUPTURA_ESTOQUE: "Ruptura de estoque",
+  ESTOQUE_BAIXO: "Estoque baixo",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  ALTA: "Alta",
+  MEDIA: "Média",
+  BAIXA: "Baixa",
+};
 
 function subscribeToStorage(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -31,6 +42,33 @@ function readUserName(): string | null | undefined {
 
 function readUserNameOnServer(): string | null | undefined {
   return undefined;
+}
+
+function formatQuantity(value: number) {
+  return quantityFormat.format(value);
+}
+
+function capped(count: number) {
+  return count >= BRIEFING_LIST_LIMIT ? `${count}+` : String(count);
+}
+
+function humanize(value: string) {
+  const text = value.replace(/_/g, " ").toLowerCase();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatDay(iso: string) {
+  if (!iso) return "hoje";
+
+  const date = new Date(`${iso}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) return "hoje";
+
+  return date.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 function Icon({
@@ -57,34 +95,11 @@ function Icon({
   );
 }
 
-const sunIcon = (
-  <Icon>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2" />
-    <path d="M12 20v2" />
-    <path d="m4.93 4.93 1.41 1.41" />
-    <path d="m17.66 17.66 1.41 1.41" />
-    <path d="M2 12h2" />
-    <path d="M20 12h2" />
-    <path d="m6.34 17.66-1.41 1.41" />
-    <path d="m19.07 4.93-1.41 1.41" />
-  </Icon>
-);
-
 const barsIcon = (
   <Icon>
     <path d="M18 20V10" />
     <path d="M12 20V4" />
     <path d="M6 20v-6" />
-  </Icon>
-);
-
-const usersIcon = (
-  <Icon>
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </Icon>
 );
 
@@ -97,14 +112,22 @@ const boxIcon = (
   </Icon>
 );
 
-const sparklesPaths = (
-  <>
+const sparklesIcon = (
+  <Icon>
     <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
     <path d="M20 3v4" />
     <path d="M22 5h-4" />
     <path d="M4 17v2" />
     <path d="M5 18H3" />
-  </>
+  </Icon>
+);
+
+const alertIcon = (
+  <Icon>
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+  </Icon>
 );
 
 const checkIcon = (
@@ -147,7 +170,7 @@ function MetricCard({
   caption,
 }: {
   icon: ReactNode;
-  badge: string;
+  badge?: string;
   label: string;
   value: string;
   caption: string;
@@ -158,12 +181,14 @@ function MetricCard({
         <span className="grid size-10 place-items-center rounded-xl bg-white/[0.06] text-acid transition metric-card-icon">
           {icon}
         </span>
-        <span className="rounded-full bg-acid/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-acid">
-          {badge}
-        </span>
+        {badge && (
+          <span className="rounded-full bg-acid/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-acid">
+            {badge}
+          </span>
+        )}
       </div>
       <p className="mt-6 text-xs text-muted">{label}</p>
-      <p className="mt-1 font-display text-3xl font-semibold tracking-tight">
+      <p className="mt-1 truncate font-display text-3xl font-semibold tracking-tight">
         {value}
       </p>
       <p className="mt-1 text-xs text-muted">{caption}</p>
@@ -196,63 +221,54 @@ function EmptyState({
   );
 }
 
-function FlowChart({ points }: { points: FlowPoint[] }) {
-  const peak = Math.max(...points.map((point) => point.value), 0);
-  const peakIndex =
-    peak > 0 ? points.findIndex((point) => point.value === peak) : -1;
-  const scaleMax = Math.max(peak, 1) * 1.1;
-  const peakHour = peakIndex >= 0 ? points[peakIndex].hour : null;
+function BlockError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="mt-5 rounded-2xl border border-dashed border-white/15 px-4 py-6 text-center">
+      <p className="text-sm font-semibold">Não foi possível carregar este bloco</p>
+      <p className="mt-1 text-xs text-muted">
+        Os outros blocos continuam disponíveis.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-4 text-sm font-semibold text-acid accent-link"
+      >
+        Tentar de novo
+      </button>
+    </div>
+  );
+}
+
+function ForecastBars({ items }: { items: BriefingForecast[] }) {
+  const max = Math.max(...items.map((item) => item.quantidadePrevista), 1);
 
   return (
-    <div
-      className="mt-6"
-      role="img"
-      aria-label={
-        peakHour
-          ? `Gráfico de fluxo de clientes por horário. Pico de ${peak} às ${peakHour}`
-          : "Gráfico de fluxo de clientes por horário"
-      }
-    >
-      <div className="relative h-44 border-b border-white/10 px-1">
-        {[0, 1, 2].map((line) => (
-          <div
-            key={line}
-            className="absolute inset-x-0 border-t border-dashed border-white/10"
-            style={{ top: `${line * 33.33}%` }}
-          />
-        ))}
-
-        <div className="relative flex h-full items-end gap-2.5">
-          {points.map((point, index) => (
+    <ul className="mt-5 space-y-4">
+      {items.map((item, index) => (
+        <li key={item.productId}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate text-sm font-semibold">
+              {item.produto}
+            </span>
+            <span className="shrink-0 text-sm font-semibold tabular-nums">
+              {formatQuantity(item.quantidadePrevista)} un.
+            </span>
+          </div>
+          <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-white/[0.06]">
             <div
-              key={point.hour}
-              className="relative flex-1 rounded-t-md"
+              className="h-full rounded-full"
               style={{
-                height: `${(point.value / scaleMax) * 100}%`,
-                background: "linear-gradient(to bottom, #d6ff00, #3b4600)",
+                width: `${(item.quantidadePrevista / max) * 100}%`,
+                background:
+                  index === 0
+                    ? "#d6ff00"
+                    : "linear-gradient(to right, #3b4600, #d6ff00)",
               }}
-            >
-              {index === peakIndex && (
-                <span className="absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 rounded-md bg-white px-2 py-0.5 text-[11px] font-bold text-ink shadow">
-                  {point.value}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-2 flex gap-2.5 px-1">
-        {points.map((point) => (
-          <span
-            key={point.hour}
-            className="flex-1 text-center text-[11px] text-muted"
-          >
-            {point.hour}
-          </span>
-        ))}
-      </div>
-    </div>
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -262,6 +278,7 @@ export default function InicioPage() {
     "loading",
   );
   const [data, setData] = useState<DailyBriefingData | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
   const [loadedAt, setLoadedAt] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const userName = useSyncExternalStore(
@@ -271,16 +288,9 @@ export default function InicioPage() {
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (userName === undefined) return;
 
-    const token = getAccessToken();
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
-    const tenantId = getTenantId();
-    if (!tenantId) {
+    if (userName === null) {
       router.replace("/onboarding");
       return;
     }
@@ -299,18 +309,13 @@ export default function InicioPage() {
         }),
       );
 
-      if (result) {
-        setData(result);
+      if (result.ok) {
+        setData(result.data);
         setStatus("ready");
         return;
       }
 
-      if (USE_EXAMPLE_DATA_ON_ERROR) {
-        setData(EXAMPLE_BRIEFING);
-        setStatus("ready");
-        return;
-      }
-
+      setErrorMessage(result.message);
       setStatus("error");
     }
 
@@ -326,26 +331,40 @@ export default function InicioPage() {
     setAttempt((current) => current + 1);
   }
 
-  const flow = data?.customerFlow ?? [];
-  const alerts = data?.alerts ?? [];
-  const replenishment = data?.replenishment ?? [];
-  const stockCount = data?.metrics?.stockAlertsCount ?? 0;
-  const updatedAt = data?.updatedAt ?? loadedAt;
+  const forecast = data
+    ? [...data.previsaoVendas].sort(
+        (a, b) => b.quantidadePrevista - a.quantidadePrevista,
+      )
+    : [];
+  const purchases = data?.compras ?? [];
+  const alerts = data?.alertas ?? [];
+  const failed = data?.secoesComFalha ?? [];
+  const forecastFailed = failed.includes("previsaoVendas");
+  const purchasesFailed = failed.includes("compras");
+  const alertsFailed = failed.includes("alertas");
+  const leader = forecast[0];
+  const forecastTotal = forecast.reduce(
+    (sum, item) => sum + item.quantidadePrevista,
+    0,
+  );
+  const highAlerts = alerts.filter((alert) => alert.prioridade === "ALTA").length;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
       <header className="mb-6 sm:mb-8">
-        {status === "ready" && updatedAt && (
+        {status === "ready" && loadedAt && (
           <div className="mb-3 flex items-center gap-2 text-sm font-medium text-acid">
             <span className="block size-2 animate-pulse rounded-full bg-acid" />
-            Briefing atualizado às {updatedAt}
+            Briefing atualizado às {loadedAt}
           </div>
         )}
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
           {userName ? `Bom dia, ${userName}.` : "Bom dia."}
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted sm:text-base">
-          Hoje promete ser movimentado. Aqui está o que merece sua atenção.
+          {status === "ready" && data
+            ? `Resumo de ${formatDay(data.data)}: o que vender, o que comprar e o que merece atenção.`
+            : "Aqui está o resumo do seu dia: o que vender, o que comprar e o que merece atenção."}
         </p>
       </header>
 
@@ -354,9 +373,7 @@ export default function InicioPage() {
       {status === "error" && (
         <section className="panel text-center">
           <p className="section-title">Não foi possível carregar o briefing</p>
-          <p className="mt-2 text-sm text-muted">
-            Verifique sua conexão e tente novamente.
-          </p>
+          <p className="mt-2 text-sm text-muted">{errorMessage}</p>
           <button
             type="button"
             onClick={handleRetry}
@@ -369,190 +386,77 @@ export default function InicioPage() {
 
       {status === "ready" && data && (
         <>
-          {/* Card Clima e Data */}
-          {data.weather && (
-            <div className="mb-4 inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3">
-              <span className="text-acid">{sunIcon}</span>
-              <div>
-                <p className="text-sm font-semibold">
-                  {data.weather.temp} · {data.weather.condition}
-                </p>
-                <p className="text-xs text-muted">
-                  {data.weather.location} · {data.weather.date}
-                </p>
-              </div>
-            </div>
-          )}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              icon={sparklesIcon}
+              label="Produto líder"
+              value={forecastFailed ? "-" : leader ? leader.produto : "Sem previsão"}
+              caption={
+                forecastFailed
+                  ? "não foi possível carregar"
+                  : leader
+                    ? `${formatQuantity(leader.quantidadePrevista)} un. previstas hoje`
+                    : "registre vendas para começar"
+              }
+            />
+            <MetricCard
+              icon={barsIcon}
+              label="Vendas previstas"
+              value={
+                forecastFailed ? "-" : `${formatQuantity(forecastTotal)} un.`
+              }
+              caption={
+                forecastFailed
+                  ? "não foi possível carregar"
+                  : forecast.length > 0
+                    ? `soma dos ${forecast.length} produtos líderes`
+                    : "nenhum produto com previsão"
+              }
+            />
+            <MetricCard
+              icon={boxIcon}
+              badge={!purchasesFailed && purchases.length > 0 ? "Atenção" : undefined}
+              label="Itens para comprar"
+              value={purchasesFailed ? "-" : capped(purchases.length)}
+              caption={
+                purchasesFailed
+                  ? "não foi possível carregar"
+                  : purchases.length > 0
+                    ? "precisam de reposição agora"
+                    : "estoque em dia"
+              }
+            />
+            <MetricCard
+              icon={alertIcon}
+              badge={!alertsFailed && highAlerts > 0 ? "Alta" : undefined}
+              label="Alertas ativos"
+              value={alertsFailed ? "-" : capped(alerts.length)}
+              caption={
+                alertsFailed
+                  ? "não foi possível carregar"
+                  : highAlerts > 0
+                    ? `${highAlerts} de prioridade alta`
+                    : "nenhum de prioridade alta"
+              }
+            />
+          </div>
 
-          {/* Aviso Explícito de Dados Estimados (Cold Start Regional) */}
-          {data.metrics?.isRegionalEstimate && (
-            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-500/20 text-amber-300 text-lg">
-                  ⚠️
-                </span>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-bold text-amber-300">
-                      Modo de Estimativa Regional (Recife & PE) Ativo
-                    </h3>
-                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
-                      Poucos dados de vendas
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-amber-200/80 leading-relaxed max-w-3xl">
-                    Seu estabelecimento ainda possui poucas vendas cadastradas. O sistema está projetando horários de pico, fluxo e sugestões com base nos <strong>benchmarks estatísticos de comércio em Pernambuco</strong>. À medida que você registrar vendas manuais ou importar planilhas, a IA calibrará os números automaticamente para o histórico real da sua loja.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/dados"
-                className="whitespace-nowrap rounded-xl bg-amber-400 px-4 py-2.5 text-xs font-bold text-black transition hover:brightness-105 active:scale-[0.99]"
-              >
-                Alimentar vendas reais →
-              </Link>
-            </div>
-          )}
-
-          {data.metrics?.peakHour === "Aguardando dados" && (
-            <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-500/20 text-blue-300 text-lg">
-                  ℹ️
-                </span>
-                <div>
-                  <h3 className="text-sm font-bold text-blue-300">
-                    Aguardando Vendas Reais do Estabelecimento
-                  </h3>
-                  <p className="mt-1 text-xs text-blue-200/80 leading-relaxed max-w-3xl">
-                    A estimativa regional da vizinhança (Cold Start) está desativada nas suas configurações. O sistema não exibirá aproximações e aguardará o registro de vendas reais para calcular o pico de movimento e o fluxo da sua loja.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/dados"
-                className="whitespace-nowrap rounded-xl bg-blue-400 px-4 py-2.5 text-xs font-bold text-black transition hover:brightness-105 active:scale-[0.99]"
-              >
-                Registrar vendas →
-              </Link>
-            </div>
-          )}
-
-          {/* ITEM 1 & 2 DO RF09: Componente Visual de "Dica da Inteligência Artificial" com Sparkles */}
-          {data.aiInsight && (
-            <section className="mb-6 overflow-hidden rounded-2xl border border-acid/25 bg-gradient-to-r from-acid/[0.08] via-white/[0.03] to-white/[0.01] p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-3.5">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-acid text-ink shadow-sm">
-                    <Icon size={18}>{sparklesPaths}</Icon>
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-acid">
-                        Inteligência Artificial
-                      </span>
-                      {data.aiInsight.impacto && (
-                        <span className="rounded-full bg-acid/15 px-2 py-0.5 text-[10px] font-semibold text-acid">
-                          {data.aiInsight.impacto}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="mt-0.5 text-base font-bold text-white">
-                      {data.aiInsight.title}
-                    </h2>
-                    <p className="mt-2 text-xs sm:text-sm leading-relaxed text-white/80">
-                      {data.aiInsight.text}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Métricas Principais */}
-          {data.metrics && (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                icon={barsIcon}
-                badge={data.metrics.salesDiff}
-                label="Vendas previstas"
-                value={data.metrics.salesForecast}
-                caption="vs. média das quartas"
-              />
-              <MetricCard
-                icon={usersIcon}
-                badge={data.metrics.isRegionalEstimate ? "Regional (PE)" : "Vendas Reais"}
-                label="Pico de movimento"
-                value={data.metrics.peakHour}
-                caption={data.metrics.isRegionalEstimate ? `${data.metrics.peakRange} (estimativa regional)` : data.metrics.peakRange}
-              />
-              <MetricCard
-                icon={boxIcon}
-                badge="Atenção"
-                label="Alertas de estoque"
-                value={`${stockCount} ${stockCount === 1 ? "item" : "itens"}`}
-                caption="precisam de ação hoje"
-              />
-              <MetricCard
-                icon={<Icon>{sparklesPaths}</Icon>}
-                badge={data.metrics.accuracyDiff}
-                label="Acurácia do modelo"
-                value={data.metrics.modelAccuracy}
-                caption="confiança da previsão"
-              />
-            </div>
-          )}
-
-          {/* Grid de Fluxo, Alertas de Estoque e Reposição */}
           <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
-            <section className="panel">
-              <div className="flex items-start justify-between">
-                <SectionHeading
-                  eyebrow="Previsão de hoje"
-                  title="Fluxo de clientes"
-                />
-                {data.metrics?.isRegionalEstimate ? (
-                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-muted">
-                    Estimativa regional PE
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-acid/15 px-2.5 py-0.5 text-[10px] font-bold text-acid">
-                    Vendas reais
-                  </span>
-                )}
-              </div>
+            <section className="panel lg:col-span-2">
+              <SectionHeading
+                eyebrow="Previsão de hoje"
+                title="Top vendas de hoje"
+              />
 
-              {flow.length > 0 ? (
-                <>
-                  <FlowChart points={flow} />
-
-                  <div className="mt-5 border-t border-white/10 pt-4">
-                    <p className="text-sm font-semibold">Previsão útil?</p>
-                    <p className="mt-0.5 text-xs text-muted">
-                      Seu feedback melhora as análises.
-                    </p>
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semibold transition accent-button"
-                      >
-                        {checkIcon}
-                        Parece certo
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-xs font-semibold transition accent-button"
-                      >
-                        Corrigir
-                      </button>
-                    </div>
-                  </div>
-                </>
+              {forecastFailed ? (
+                <BlockError onRetry={handleRetry} />
+              ) : forecast.length > 0 ? (
+                <ForecastBars items={forecast} />
               ) : (
                 <EmptyState
                   icon={barsIcon}
                   title="Ainda não há previsão para hoje"
-                  description="Registre algumas vendas para o sistema começar a prever o fluxo de clientes."
+                  description="Registre algumas vendas para o sistema começar a prever as vendas dos seus produtos."
                   action={
                     <Link
                       href="/dados"
@@ -566,48 +470,106 @@ export default function InicioPage() {
               )}
             </section>
 
-            {/* ITEM 3 DO RF09: Mantém os alertas de estoque / atenção imediata */}
             <section className="panel">
               <SectionHeading
-                eyebrow="Atenção imediata"
-                title="Alertas do dia"
-                aside={
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-acid text-sm font-bold text-ink">
-                    {alerts.length}
-                  </span>
-                }
+                eyebrow="Atenção"
+                title="Reposição de estoque"
               />
 
-              {alerts.length > 0 ? (
+              {purchasesFailed ? (
+                <BlockError onRetry={handleRetry} />
+              ) : purchases.length > 0 ? (
                 <>
-                  <ul className="mt-5 space-y-3">
-                    {alerts.map((alert) => (
+                  <ul className="mt-5 divide-y divide-white/10">
+                    {purchases.map((item) => (
                       <li
-                        key={alert.id}
-                        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                        key={item.productId}
+                        className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                       >
-                        <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-acid">
-                          <span className="size-1.5 rounded-full bg-acid" />
-                          {alert.badge}
-                        </p>
-                        <p className="mt-2 text-sm font-semibold">
-                          {alert.title}
-                        </p>
-                        <p className="mt-1 text-xs leading-5 text-muted">
-                          {alert.description}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">
+                            {item.produto}
+                          </p>
+                          <p className="text-xs text-muted">
+                            Estoque {item.estoqueAtual} · mínimo{" "}
+                            {item.estoqueMinimo}
+                            {item.metodo === "PADRAO"
+                              ? " · sugestão padrão"
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold">
+                            {item.quantidadeSugerida} un.
+                          </p>
+                          <p className="text-[10px] text-muted">sugestão</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
 
                   <Link
-                    href="/estoque"
+                    href="/compras"
                     className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-acid accent-link"
                   >
-                    Ver todos os alertas
+                    Ver lista de compras
                     {chevronIcon}
                   </Link>
                 </>
+              ) : (
+                <EmptyState
+                  icon={checkIcon}
+                  title="Nada para repor agora"
+                  description="Seu estoque está em dia. Quando algum item precisar de reposição, ele aparece aqui."
+                />
+              )}
+            </section>
+
+            <section className="panel">
+              <SectionHeading
+                eyebrow="Atenção imediata"
+                title="Alertas operacionais"
+                aside={
+                  !alertsFailed ? (
+                    <span className="grid h-8 min-w-8 shrink-0 place-items-center rounded-full bg-acid px-2 text-sm font-bold text-ink">
+                      {capped(alerts.length)}
+                    </span>
+                  ) : undefined
+                }
+              />
+
+              {alertsFailed ? (
+                <BlockError onRetry={handleRetry} />
+              ) : alerts.length > 0 ? (
+                <ul className="mt-5 space-y-3">
+                  {alerts.map((alert) => (
+                    <li
+                      key={alert.id}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-acid">
+                          <span className="size-1.5 rounded-full bg-acid" />
+                          {ALERT_LABELS[alert.tipo] ?? humanize(alert.tipo)}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            alert.prioridade === "ALTA"
+                              ? "bg-acid text-ink"
+                              : "bg-acid/10 text-acid"
+                          }`}
+                        >
+                          {PRIORITY_LABELS[alert.prioridade] ??
+                            humanize(alert.prioridade)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold">{alert.titulo}</p>
+                      <p className="mt-1 text-xs leading-5 text-muted">
+                        {alert.descricao}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               ) : (
                 <EmptyState
                   icon={checkIcon}
@@ -616,70 +578,6 @@ export default function InicioPage() {
                 />
               )}
             </section>
-
-            <section className="panel">
-              <SectionHeading
-                eyebrow="Reposição inteligente"
-                title="O que comprar hoje"
-              />
-
-              {replenishment.length > 0 ? (
-                <ul className="mt-5 divide-y divide-white/10">
-                  {replenishment.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold">{item.product}</p>
-                        <p className="text-xs text-muted">{item.actionTime}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">
-                          {item.suggestedQty}
-                        </p>
-                        <p className="text-[10px] text-muted">sugestão</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState
-                  icon={boxIcon}
-                  title="Nada para repor hoje"
-                  description="Seu estoque está em dia. As sugestões de compra aparecem aqui quando forem necessárias."
-                />
-              )}
-            </section>
-
-            {data.opportunity && (
-              <section className="relative overflow-hidden rounded-3xl bg-acid p-6 text-ink">
-                <span className="absolute -right-12 -top-12 size-44 rounded-full bg-black/[0.07]" />
-                <span className="absolute -right-4 -top-4 size-28 rounded-full bg-acid" />
-
-                <div className="relative">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white">
-                    <Icon size={14}>{sparklesPaths}</Icon>
-                    Oportunidade
-                  </span>
-
-                  <h2 className="mt-4 font-display text-2xl font-semibold leading-tight">
-                    {data.opportunity.title}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-ink/70">
-                    {data.opportunity.description}
-                  </p>
-
-                  <Link
-                    href="/promocoes"
-                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-black"
-                  >
-                    Simular promoção
-                    {chevronIcon}
-                  </Link>
-                </div>
-              </section>
-            )}
           </div>
         </>
       )}

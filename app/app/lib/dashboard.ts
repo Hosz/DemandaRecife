@@ -1,135 +1,89 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-import { withAuth, redirectToLogin } from "./auth";
+import { withAuth } from "./auth";
 
-export type DailyBriefingData = {
-  updatedAt?: string;
-  weather?: {
-    temp: string;
-    condition: string;
-    location: string;
-    date: string;
-  };
-  metrics?: {
-    salesForecast: string;
-    salesDiff: string;
-    peakHour: string;
-    peakRange: string;
-    stockAlertsCount: number;
-    modelAccuracy: string;
-    accuracyDiff: string;
-    isRegionalEstimate?: boolean;
-  };
-  customerFlow?: { hour: string; value: number; highlight?: boolean }[];
-  alerts?: { id: string; badge: string; title: string; description: string }[];
-  replenishment?: {
-    id: string;
-    product: string;
-    actionTime: string;
-    suggestedQty: string;
-  }[];
-  opportunity?: { title: string; description: string };
-  // RF09: Campo de Insight textual gerado pela IA
-  aiInsight?: {
-    title: string;
-    text: string;
-    impacto?: string;
-  };
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+export const BRIEFING_LIST_LIMIT = 10;
+
+export type BriefingAlert = {
+  id: string;
+  productId: string | null;
+  tipo: string;
+  titulo: string;
+  descricao: string;
+  prioridade: string;
+  status: string;
+  criadoEm: string;
 };
 
-export async function fetchDailyBriefing(): Promise<DailyBriefingData | null> {
+export type BriefingPurchase = {
+  productId: string;
+  produto: string;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  estoqueMaximo: number;
+  comprarAgora: boolean;
+  quantidadeSugerida: number;
+  metodo: string;
+};
+
+export type BriefingForecast = {
+  productId: string;
+  produto: string;
+  quantidadePrevista: number;
+};
+
+export type DailyBriefingData = {
+  data: string;
+  alertas: BriefingAlert[];
+  compras: BriefingPurchase[];
+  previsaoVendas: BriefingForecast[];
+  secoesComFalha: string[];
+};
+
+export type BriefingResult =
+  | { ok: true; data: DailyBriefingData }
+  | { ok: false; message: string };
+
+export async function fetchDailyBriefing(): Promise<BriefingResult> {
+  let response: Response;
+
   try {
-    const response = await fetch(
+    response = await fetch(
       `${API_URL}/api/dashboard/daily-briefing`,
       withAuth({ cache: "no-store" }),
     );
-
-    if (response.status === 401) {
-      redirectToLogin();
-      return null;
-    }
-
-    if (!response.ok) return null;
-
-    return (await response.json()) as DailyBriefingData;
   } catch {
-    return null;
+    return { ok: false, message: "Não foi possível conectar ao servidor." };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      message: "Sua sessão não é válida. Entre novamente para ver o briefing.",
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: "O servidor não conseguiu montar o briefing agora.",
+    };
+  }
+
+  try {
+    const body = (await response.json()) as Partial<DailyBriefingData>;
+
+    return {
+      ok: true,
+      data: {
+        data: body.data ?? "",
+        alertas: body.alertas ?? [],
+        compras: body.compras ?? [],
+        previsaoVendas: body.previsaoVendas ?? [],
+        secoesComFalha: body.secoesComFalha ?? [],
+      },
+    };
+  } catch {
+    return { ok: false, message: "O servidor devolveu uma resposta inesperada." };
   }
 }
-
-export const EXAMPLE_BRIEFING: DailyBriefingData = {
-  weather: {
-    temp: "28°C",
-    condition: "Ensolarado",
-    location: "Recife, PE",
-    date: "Quarta, 12 jun",
-  },
-  metrics: {
-    salesForecast: "R$ 4.850",
-    salesDiff: "+18%",
-    peakHour: "18:00",
-    peakRange: "entre 17h e 19h",
-    stockAlertsCount: 3,
-    modelAccuracy: "91,8%",
-    accuracyDiff: "+2,4%",
-  },
-  // RF09: Dica/Insight gerado pelo motor preditivo
-  aiInsight: {
-    title: "Recomendação Preditiva da IA",
-    text: "Detectamos um pico atípico previsto para as 18h com alta rotação de panificados e frios. Sugerimos antecipar a segunda fornada de pães para as 16h30 e preparar a reposição de queijos para evitar rupturas na hora de pico.",
-    impacto: "Potencial de +12% em conversão",
-  },
-  customerFlow: [
-    { hour: "08h", value: 30 },
-    { hour: "10h", value: 42 },
-    { hour: "12h", value: 55 },
-    { hour: "14h", value: 48 },
-    { hour: "16h", value: 68 },
-    { hour: "18h", value: 86, highlight: true },
-    { hour: "20h", value: 60 },
-  ],
-  alerts: [
-    {
-      id: "1",
-      badge: "Ruptura prevista",
-      title: "Leite integral",
-      description: "Restam 8 unidades. Estoque acaba antes das 16h.",
-    },
-    {
-      id: "2",
-      badge: "Próximo ao vencimento",
-      title: "Iogurte natural",
-      description: "12 unidades vencem em 2 dias. Considere uma promoção.",
-    },
-    {
-      id: "3",
-      badge: "Alta demanda",
-      title: "Pico no fim do dia",
-      description: "Movimento 32% acima da média entre 17h e 19h.",
-    },
-  ],
-  replenishment: [
-    {
-      id: "1",
-      product: "Leite integral",
-      actionTime: "Comprar até 10h",
-      suggestedQty: "24 un.",
-    },
-    {
-      id: "2",
-      product: "Farinha de trigo",
-      actionTime: "Comprar até 14h",
-      suggestedQty: "15 kg",
-    },
-    {
-      id: "3",
-      product: "Café em grãos",
-      actionTime: "Comprar amanhã",
-      suggestedQty: "8 un.",
-    },
-  ],
-  opportunity: {
-    title: "Uma promoção pode salvar sua margem.",
-    description:
-      "Ofereça até 18% de desconto nos iogurtes e preserve uma margem positiva de 12%.",
-  },
-};
