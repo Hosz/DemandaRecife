@@ -47,91 +47,108 @@ foram extraídos dos controllers da aplicação.
 
 ### Autenticação e tenants
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| POST | `/api/auth/register` | Cria usuário |
-| POST | `/api/auth/login` | Autentica usuário |
-| POST | `/api/auth/refresh` | Atualiza tokens |
-| GET | `/api/auth/me` | Retorna usuário autenticado |
-| POST | `/api/auth/onboard` | Cria tenant e perfil inicial |
-| POST | `/api/tenants/onboarding` | Alias do onboarding |
-| POST | `/api/tenants` | Alias para criação de tenant |
-| GET | `/api/tenants/{id}` | Consulta tenant |
-| PUT | `/api/tenants/{id}` | Substitui dados do tenant |
-| PATCH | `/api/tenants/{id}` | Atualiza dados do tenant |
+| Método | Endpoint                  | Descrição                    |
+| ------ | ------------------------- | ---------------------------- |
+| POST   | `/api/auth/register`      | Cria usuário                 |
+| POST   | `/api/auth/login`         | Autentica usuário            |
+| POST   | `/api/auth/refresh`       | Atualiza tokens              |
+| GET    | `/api/auth/me`            | Retorna usuário autenticado  |
+| POST   | `/api/auth/onboard`       | Cria tenant e perfil inicial |
+| POST   | `/api/tenants/onboarding` | Alias do onboarding          |
+| POST   | `/api/tenants`            | Alias para criação de tenant |
+| GET    | `/api/tenants/{id}`       | Consulta tenant              |
+| PUT    | `/api/tenants/{id}`       | Substitui dados do tenant    |
+| PATCH  | `/api/tenants/{id}`       | Atualiza dados do tenant     |
 
 ### Produtos e estoque
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/products` | Lista produtos do tenant |
-| DELETE | `/api/products/{id}` | Exclui produto e seus dados dependentes |
-| GET | `/api/products/benchmarks/suggestions` | Lista sugestões de produtos; aceita `nicho` |
-| GET | `/api/products/starter-kit/status` | Consulta status do kit inicial; aceita `nicho` |
-| POST | `/api/products/starter-kit` | Adiciona kit inicial; aceita `nicho` ou lista de IDs |
-| GET | `/api/replenishment` | Lista sugestões de reposição; aceita `apenasComprar` |
+| Método | Endpoint                               | Descrição                                            |
+| ------ | -------------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/products`                        | Lista produtos do tenant                             |
+| DELETE | `/api/products/{id}`                   | Exclui produto e seus dados dependentes              |
+| GET    | `/api/products/benchmarks/suggestions` | Lista sugestões de produtos; aceita `nicho`          |
+| GET    | `/api/products/starter-kit/status`     | Consulta status do kit inicial; aceita `nicho`       |
+| POST   | `/api/products/starter-kit`            | Adiciona kit inicial; aceita `nicho` ou lista de IDs |
+| GET    | `/api/replenishment`                   | Lista sugestões de reposição; aceita `apenasComprar` |
 
 ### Vendas e previsão
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| POST | `/api/sales` | Registra venda |
-| POST | `/api/sales/upload` | Importa vendas via multipart (`file`) |
-| GET | `/api/forecast` | Gera previsão; aceita `data` no formato `YYYY-MM-DD` |
-| GET | `/api/dashboard/daily-briefing` | Retorna resumo diário |
+| Método | Endpoint                        | Descrição                                            |
+| ------ | ------------------------------- | ---------------------------------------------------- |
+| POST   | `/api/sales`                    | Registra venda                                       |
+| POST   | `/api/sales/upload`             | Importa vendas via multipart (`file`)                |
+| GET    | `/api/forecast`                 | Gera previsão; aceita `data` no formato `YYYY-MM-DD` |
+| GET    | `/api/dashboard/daily-briefing` | Retorna resumo diário                                |
 
 ### Alertas e recomendações
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/alerts` | Lista alertas; aceita `status` e `apenasNaoLidos` |
-| GET | `/api/alerts/count` | Conta alertas ativos |
-| PATCH | `/api/alerts/{id}/read` | Marca alerta como lido |
-| PATCH | `/api/alerts/{id}/resolve` | Resolve alerta |
-| GET | `/api/recommendations/daily` | Lista recomendações do dia |
-| POST | `/api/recommendations/regenerate` | Regenera recomendações |
-| PATCH | `/api/recommendations/{id}/apply` | Aplica recomendação |
-| PATCH | `/api/recommendations/{id}/dismiss` | Descarta recomendação |
+| Método | Endpoint                            | Descrição                                         |
+| ------ | ----------------------------------- | ------------------------------------------------- |
+| GET    | `/api/alerts`                       | Lista alertas; aceita `status` e `apenasNaoLidos` |
+| GET    | `/api/alerts/count`                 | Conta alertas ativos                              |
+| PATCH  | `/api/alerts/{id}/read`             | Marca alerta como lido                            |
+| PATCH  | `/api/alerts/{id}/resolve`          | Resolve alerta                                    |
+| GET    | `/api/recommendations/daily`        | Lista recomendações do dia                        |
+| POST   | `/api/recommendations/regenerate`   | Regenera recomendações                            |
+| PATCH  | `/api/recommendations/{id}/apply`   | Aplica recomendação                               |
+| PATCH  | `/api/recommendations/{id}/dismiss` | Descarta recomendação                             |
 
 ### Promoções
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/promotions/simulation` | Simula promoção; requer `productId` e aceita desconto ou preço-alvo |
-| GET | `/api/promotions/campaigns` | Lista campanhas |
-| POST | `/api/promotions/campaigns` | Cria campanha |
-| PUT | `/api/promotions/campaigns/{id}` | Atualiza campanha |
-| DELETE | `/api/promotions/campaigns/{id}` | Exclui campanha |
+| Método | Endpoint                         | Descrição                                                           |
+| ------ | -------------------------------- | ------------------------------------------------------------------- |
+| GET    | `/api/promotions/simulation`     | Simula promoção; requer `productId` e aceita desconto ou preço-alvo |
+| GET    | `/api/promotions/campaigns`      | Lista campanhas                                                     |
+| POST   | `/api/promotions/campaigns`      | Cria campanha                                                       |
+| PUT    | `/api/promotions/campaigns/{id}` | Atualiza campanha                                                   |
+| DELETE | `/api/promotions/campaigns/{id}` | Exclui campanha                                                     |
 
 ### Equipe e turnos
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/team/members` | Lista membros |
-| POST | `/api/team/members` | Adiciona membro |
-| DELETE | `/api/team/members/{id}` | Exclui membro |
-| GET | `/api/team/shifts` | Lista turnos; aceita `diaSemana` |
-| POST | `/api/team/shifts` | Salva turno |
-| DELETE | `/api/team/shifts/{id}` | Exclui turno |
+| Método | Endpoint                 | Descrição                        |
+| ------ | ------------------------ | -------------------------------- |
+| GET    | `/api/team/members`      | Lista membros                    |
+| POST   | `/api/team/members`      | Adiciona membro                  |
+| DELETE | `/api/team/members/{id}` | Exclui membro                    |
+| GET    | `/api/team/shifts`       | Lista turnos; aceita `diaSemana` |
+| POST   | `/api/team/shifts`       | Salva turno                      |
+| DELETE | `/api/team/shifts/{id}`  | Exclui turno                     |
 
 ### Integrações externas
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/external/weather` | Consulta clima; aceita `cidade` e `estado` |
-| GET | `/api/external/holidays` | Lista feriados; aceita `cidade`, `estado` e `dias` |
-| GET | `/api/external/status` | Retorna status das integrações |
-| POST | `/api/v1/sync/weather` | Sincroniza clima; aceita `cidade` e `estado` |
-| POST | `/api/v1/sync/holidays` | Sincroniza feriados; aceita `ano`, `anoInicio` e `anoFim` |
+| Método | Endpoint                 | Descrição                                                 |
+| ------ | ------------------------ | --------------------------------------------------------- |
+| GET    | `/api/external/weather`  | Consulta clima; aceita `cidade` e `estado`                |
+| GET    | `/api/external/holidays` | Lista feriados; aceita `cidade`, `estado` e `dias`        |
+| GET    | `/api/external/status`   | Retorna status das integrações                            |
+| POST   | `/api/v1/sync/weather`   | Sincroniza clima; aceita `cidade` e `estado`              |
+| POST   | `/api/v1/sync/holidays`  | Sincroniza feriados; aceita `ano`, `anoInicio` e `anoFim` |
 
 ### Notificações push
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/push/public-key` | Retorna chave pública VAPID |
-| POST | `/api/push/subscribe` | Registra inscrição push |
-| DELETE | `/api/push/subscribe` | Remove inscrição push |
+| Método | Endpoint               | Descrição                   |
+| ------ | ---------------------- | --------------------------- |
+| GET    | `/api/push/public-key` | Retorna chave pública VAPID |
+| POST   | `/api/push/subscribe`  | Registra inscrição push     |
+| DELETE | `/api/push/subscribe`  | Remove inscrição push       |
 
 Os endpoints de autenticação, tenants, integrações externas e sincronização são
 públicos conforme a configuração de segurança. Os demais endpoints exigem
 autenticação e, quando aplicável, usam o tenant associado ao token JWT.
+
+### Integrantes
+
+- Adryan Galdino Soares / 01809292
+- Allyson Allan Martins Pontes / 01854829
+- Emilaine Bernado Da Silva / 01763693
+- Marcelo Travassos Lima De Souza / 01813851
+- Murilo Henrique Marques Bento Santos / 01840008
+
+### Funções
+
+- Líder Técnico: Murilo
+- Designer de UX/UI: Adryan
+- Desenvolvedor(a) Front-End: Emilaine, Allysson e Marcelo
+- Desenvolvedor Back-End: Adryan e Murilo
+- Arquiteto de Dados: Adryan e Murilo
+- QA: Adryan e Murilo
