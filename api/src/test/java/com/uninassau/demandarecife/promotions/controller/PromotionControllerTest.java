@@ -58,12 +58,14 @@ class PromotionControllerTest {
         UUID tenantId = UUID.randomUUID();
         when(currentTenant.id()).thenReturn(tenantId);
 
+        UUID prod1 = UUID.randomUUID();
+        UUID prod2 = UUID.randomUUID();
         CreateCampaignRequest req = new CreateCampaignRequest(
-                UUID.randomUUID(), "Oferta Café", "+R$ 200", 15, new BigDecimal("8.50"), "Ativa", "Hoje", null, "São João"
+                prod1, "Oferta Café", "+R$ 200", 15, new BigDecimal("8.50"), "Ativa", "Hoje", null, "São João", "18:00", "22:00", List.of(prod1, prod2)
         );
 
         PromotionalCampaign saved = new PromotionalCampaign(
-                tenantId, req.productId(), req.titulo(), req.detalhe(), req.descontoPercentual(), req.precoPromocional(), req.status(), req.data(), req.dataFim(), req.eventoVinculado()
+                tenantId, req.productId(), req.productIds(), req.titulo(), req.detalhe(), req.descontoPercentual(), req.precoPromocional(), req.status(), req.data(), req.dataFim(), req.horarioInicio(), req.horarioFim(), req.eventoVinculado()
         );
         saved.setId(UUID.randomUUID());
 
@@ -73,5 +75,20 @@ class PromotionControllerTest {
 
         assertThat(result.titulo()).isEqualTo("Oferta Café");
         assertThat(result.descontoPercentual()).isEqualTo(15);
+        assertThat(result.horarioInicio()).isEqualTo("18:00");
+        assertThat(result.horarioFim()).isEqualTo("22:00");
+        assertThat(result.productIds()).containsExactly(prod1, prod2);
+    }
+
+    @Test
+    @DisplayName("Deve deletar campanha promocional do tenant")
+    void deveDeletarCampanha() {
+        UUID tenantId = UUID.randomUUID();
+        UUID campaignId = UUID.randomUUID();
+        when(currentTenant.id()).thenReturn(tenantId);
+
+        controller.deleteCampaign(campaignId);
+
+        org.mockito.Mockito.verify(campaignRepository).deleteByTenantIdAndId(tenantId, campaignId);
     }
 }

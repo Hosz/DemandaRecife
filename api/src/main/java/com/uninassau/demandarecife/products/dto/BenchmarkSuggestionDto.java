@@ -9,5 +9,17 @@ public record BenchmarkSuggestionDto(
         String categoria,
         BigDecimal precoSugerido,
         BigDecimal mediaDiaria,
-        String unidade
-) {}
+        String unidade,
+        boolean jaAdicionado
+) {
+    public BenchmarkSuggestionDto(
+            UUID id,
+            String nomeSugerido,
+            String categoria,
+            BigDecimal precoSugerido,
+            BigDecimal mediaDiaria,
+            String unidade
+    ) {
+        this(id, nomeSugerido, categoria, precoSugerido, mediaDiaria, unidade, false);
+    }
+}

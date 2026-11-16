@@ -10,6 +10,7 @@ import com.uninassau.demandarecife.shared.tenant.CurrentTenant;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -46,7 +47,10 @@ public class PromotionController {
                         c.getStatus(),
                         c.getDataCampanha(),
                         c.getDataFim(),
-                        c.getEventoVinculado()
+                        c.getEventoVinculado(),
+                        c.getHorarioInicio(),
+                        c.getHorarioFim(),
+                        c.getProductIds()
                 ))
                 .toList();
     }
@@ -54,9 +58,15 @@ public class PromotionController {
     @PostMapping("/campaigns")
     @ResponseStatus(HttpStatus.CREATED)
     public CampaignDto createCampaign(@Valid @RequestBody CreateCampaignRequest req) {
+        UUID primaryProdId = req.productId();
+        if (primaryProdId == null && req.productIds() != null && !req.productIds().isEmpty()) {
+            primaryProdId = req.productIds().get(0);
+        }
+
         PromotionalCampaign campaign = new PromotionalCampaign(
                 currentTenant.id(),
-                req.productId(),
+                primaryProdId,
+                req.productIds(),
                 req.titulo(),
                 req.detalhe(),
                 req.descontoPercentual(),
@@ -64,6 +74,8 @@ public class PromotionController {
                 req.status() != null ? req.status() : "Ativa",
                 req.data() != null ? req.data() : "Hoje",
                 req.dataFim(),
+                req.horarioInicio(),
+                req.horarioFim(),
                 req.eventoVinculado()
         );
         PromotionalCampaign saved = campaignRepository.save(campaign);
@@ -77,7 +89,10 @@ public class PromotionController {
                 saved.getStatus(),
                 saved.getDataCampanha(),
                 saved.getDataFim(),
-                saved.getEventoVinculado()
+                saved.getEventoVinculado(),
+                saved.getHorarioInicio(),
+                saved.getHorarioFim(),
+                saved.getProductIds()
         );
     }
 
@@ -93,6 +108,10 @@ public class PromotionController {
                     if (req.status() != null) c.setStatus(req.status());
                     if (req.data() != null) c.setDataCampanha(req.data());
                     if (req.dataFim() != null) c.setDataFim(req.dataFim());
+                    if (req.horarioInicio() != null) c.setHorarioInicio(req.horarioInicio());
+                    if (req.horarioFim() != null) c.setHorarioFim(req.horarioFim());
+                    if (req.productIds() != null) c.setProductIds(req.productIds());
+                    if (req.productId() != null) c.setProductId(req.productId());
                     if (req.eventoVinculado() != null) c.setEventoVinculado(req.eventoVinculado());
                     PromotionalCampaign saved = campaignRepository.save(c);
                     return new CampaignDto(
@@ -105,7 +124,10 @@ public class PromotionController {
                             saved.getStatus(),
                             saved.getDataCampanha(),
                             saved.getDataFim(),
-                            saved.getEventoVinculado()
+                            saved.getEventoVinculado(),
+                            saved.getHorarioInicio(),
+                            saved.getHorarioFim(),
+                            saved.getProductIds()
                     );
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Campanha não encontrada"));
@@ -113,6 +135,7 @@ public class PromotionController {
 
     @DeleteMapping("/campaigns/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
     public void deleteCampaign(@PathVariable UUID id) {
         campaignRepository.deleteByTenantIdAndId(currentTenant.id(), id);
     }

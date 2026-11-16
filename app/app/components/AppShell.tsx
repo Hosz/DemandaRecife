@@ -309,6 +309,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6 sm:pt-10">
         <DashboardSkeleton />
+        <div style={{ display: "none" }} aria-hidden="true">
+          {children}
+        </div>
       </div>
     );
   }

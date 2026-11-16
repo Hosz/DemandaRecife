@@ -24,6 +24,16 @@ interface ShiftGridProps {
   onUpdateShift: (shiftId: string, updated: Partial<Turno>) => void;
   onAddShift?: (newShift: Omit<Turno, "id">) => void;
   onDeleteShift?: (shiftId: string) => void;
+  highlightedShiftId?: string | null;
+  aiSuggestedShift?: {
+    horarioInicio: string;
+    horarioFim: string;
+    demanda: string;
+    tipoDemanda: "baixa" | "media" | "alta";
+    funcao: string;
+    intervalo: string;
+    observacoes: string;
+  } | null;
 }
 
 const FUNCOES = [
@@ -49,6 +59,8 @@ export function ShiftGrid({
   onUpdateShift,
   onAddShift,
   onDeleteShift,
+  highlightedShiftId = null,
+  aiSuggestedShift = null,
 }: ShiftGridProps) {
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [tempHelperName, setTempHelperName] = useState("");
@@ -63,6 +75,29 @@ export function ShiftGrid({
   const [newShiftIntervalo, setNewShiftIntervalo] = useState("1 hora (almoço / descanso)");
   const [newShiftObs, setNewShiftObs] = useState("");
   const [newShiftVaga, setNewShiftVaga] = useState(false);
+
+  const handleOpenAddModal = () => {
+    if (aiSuggestedShift) {
+      setNewShiftStart(aiSuggestedShift.horarioInicio);
+      setNewShiftEnd(aiSuggestedShift.horarioFim);
+      setNewShiftFuncao(aiSuggestedShift.funcao);
+      setNewShiftTipo(aiSuggestedShift.tipoDemanda);
+      setNewShiftDemanda(aiSuggestedShift.demanda);
+      setNewShiftIntervalo(aiSuggestedShift.intervalo);
+      setNewShiftObs(aiSuggestedShift.observacoes);
+      setNewShiftVaga(false);
+    } else {
+      setNewShiftStart("06:00");
+      setNewShiftEnd("14:00");
+      setNewShiftFuncao("Atendimento / Balcão");
+      setNewShiftTipo("media");
+      setNewShiftDemanda("Demanda média");
+      setNewShiftIntervalo("1 hora (almoço / descanso)");
+      setNewShiftObs("");
+      setNewShiftVaga(false);
+    }
+    setShowAddShiftModal(true);
+  };
 
   const editingShift = shifts.find((s) => s.id === editingShiftId) || null;
 
@@ -137,7 +172,7 @@ export function ShiftGrid({
         {onAddShift && (
           <button
             type="button"
-            onClick={() => setShowAddShiftModal(true)}
+            onClick={handleOpenAddModal}
             className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10"
           >
             <span>+ Adicionar turno detalhado</span>
@@ -151,7 +186,7 @@ export function ShiftGrid({
           {onAddShift && (
             <button
               type="button"
-              onClick={() => setShowAddShiftModal(true)}
+              onClick={handleOpenAddModal}
               className="mt-3 inline-block rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20 transition"
             >
               Criar primeiro turno
@@ -160,20 +195,31 @@ export function ShiftGrid({
         </div>
       ) : (
         <div className="space-y-3">
-          {shifts.map((shift) => (
-            <article
-              key={shift.id}
-              className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-[#121214] p-5 sm:flex-row sm:items-center sm:justify-between transition-all hover:border-zinc-700"
-            >
-              <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="text-base font-bold text-white">{shift.horario}</h4>
-                  
-                  {shift.funcao && (
-                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-zinc-300">
-                      {shift.funcao}
-                    </span>
-                  )}
+          {shifts.map((shift) => {
+            const isHighlighted = highlightedShiftId === shift.id;
+            return (
+              <article
+                key={shift.id}
+                className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between transition-all duration-500 ${
+                  isHighlighted
+                    ? "border-[#D4FF00] ring-2 ring-[#D4FF00]/50 shadow-xl shadow-[#D4FF00]/15 bg-[#171912] scale-[1.01]"
+                    : "border-zinc-800 bg-[#121214] hover:border-zinc-700"
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="text-base font-bold text-white">{shift.horario}</h4>
+                    {isHighlighted && (
+                      <span className="rounded-full bg-[#D4FF00] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-black animate-pulse">
+                        ✨ Atualizado pela IA
+                      </span>
+                    )}
+
+                    {shift.funcao && (
+                      <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-zinc-300">
+                        {shift.funcao}
+                      </span>
+                    )}
 
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
@@ -263,8 +309,9 @@ export function ShiftGrid({
                 )}
               </div>
             </article>
-          ))}
-        </div>
+          );
+        })}
+      </div>
       )}
 
       {/* Modal de Edição de Turno */}
@@ -485,6 +532,39 @@ export function ShiftGrid({
             </div>
 
             <form onSubmit={handleCreateShift} className="mt-4 space-y-4">
+              {aiSuggestedShift && (
+                <div className="flex flex-col gap-2 rounded-xl bg-[#D4FF00]/10 border border-[#D4FF00]/25 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">✨</span>
+                      <div>
+                        <p className="text-xs font-bold text-[#D4FF00]">
+                          Sugestão da IA: {aiSuggestedShift.horarioInicio} às {aiSuggestedShift.horarioFim}
+                        </p>
+                        <p className="text-[11px] text-zinc-300">
+                          {aiSuggestedShift.funcao} • {aiSuggestedShift.demanda}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewShiftStart(aiSuggestedShift.horarioInicio);
+                        setNewShiftEnd(aiSuggestedShift.horarioFim);
+                        setNewShiftFuncao(aiSuggestedShift.funcao);
+                        setNewShiftTipo(aiSuggestedShift.tipoDemanda);
+                        setNewShiftDemanda(aiSuggestedShift.demanda);
+                        setNewShiftIntervalo(aiSuggestedShift.intervalo);
+                        setNewShiftObs(aiSuggestedShift.observacoes);
+                      }}
+                      className="shrink-0 rounded-lg bg-[#D4FF00] px-2.5 py-1 text-[11px] font-bold text-black hover:brightness-105"
+                    >
+                      Preencher com IA
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1">Início</label>

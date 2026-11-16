@@ -12,7 +12,12 @@ import { DashboardSkeleton } from "./components/DashboardSkeleton";
 import {
   EXAMPLE_BRIEFING,
   fetchDailyBriefing,
+  applyRecommendation,
+  dismissRecommendation,
+  regenerateRecommendation,
+  regenerateRecommendations,
   type DailyBriefingData,
+  type AiInsightItem,
 } from "./lib/dashboard";
 import { getAccessToken, getTenantId } from "./lib/auth";
 
@@ -321,6 +326,84 @@ export default function InicioPage() {
     };
   }, [userName, attempt, router]);
 
+  const [selectedAreaTab, setSelectedAreaTab] = useState<string>("TODAS");
+  const [appliedRecIds, setAppliedRecIds] = useState<Record<string, boolean>>({});
+  const [dismissedRecIds, setDismissedRecIds] = useState<Record<string, boolean>>({});
+  const [isApplyingMap, setIsApplyingMap] = useState<Record<string, boolean>>({});
+  const [isRegeneratingRec, setIsRegeneratingRec] = useState(false);
+
+  useEffect(() => {
+    if (data?.aiInsights && data.aiInsights.length > 0) {
+      const initialApplied: Record<string, boolean> = {};
+      const initialDismissed: Record<string, boolean> = {};
+      data.aiInsights.forEach((item) => {
+        const key = item.id || item.categoria || item.title;
+        if (item.status === "APLICADO") initialApplied[key] = true;
+        if (item.status === "DISPENSADO") initialDismissed[key] = true;
+      });
+      setAppliedRecIds(initialApplied);
+      setDismissedRecIds(initialDismissed);
+    } else if (data?.aiInsight) {
+      const key = data.aiInsight.id || data.aiInsight.categoria || data.aiInsight.title;
+      if (data.aiInsight.status === "APLICADO") setAppliedRecIds({ [key]: true });
+      if (data.aiInsight.status === "DISPENSADO") setDismissedRecIds({ [key]: true });
+    }
+  }, [data]);
+
+  async function handleApplyRec(item: AiInsightItem) {
+    const key = item.id || item.categoria || item.title;
+    if (!item.id) {
+      setAppliedRecIds((prev) => ({ ...prev, [key]: true }));
+      return;
+    }
+    setIsApplyingMap((prev) => ({ ...prev, [key]: true }));
+    const ok = await applyRecommendation(item.id);
+    setIsApplyingMap((prev) => ({ ...prev, [key]: false }));
+    if (ok) {
+      setAppliedRecIds((prev) => ({ ...prev, [key]: true }));
+    }
+  }
+
+  async function handleDismissRec(item: AiInsightItem) {
+    const key = item.id || item.categoria || item.title;
+    if (item.id) {
+      await dismissRecommendation(item.id);
+    }
+    setDismissedRecIds((prev) => ({ ...prev, [key]: true }));
+  }
+
+  async function handleRegenerateAllRecommendations() {
+    setIsRegeneratingRec(true);
+    const newInsights = await regenerateRecommendations();
+    setIsRegeneratingRec(false);
+    if (newInsights && newInsights.length > 0) {
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          aiInsight: newInsights[0],
+          aiInsights: newInsights,
+        };
+      });
+      setAppliedRecIds({});
+      setDismissedRecIds({});
+    }
+  }
+
+  function getAreaMeta(categoria?: string) {
+    const cat = (categoria || "").toUpperCase();
+    if (cat.includes("ESTOQUE")) {
+      return { label: "Estoque & Compras", icon: "📦", badgeColor: "bg-blue-500/15 text-blue-300 border-blue-500/30" };
+    }
+    if (cat.includes("EQUIPE")) {
+      return { label: "Equipe & Escala", icon: "👥", badgeColor: "bg-purple-500/15 text-purple-300 border-purple-500/30" };
+    }
+    if (cat.includes("PROMOCAO") || cat.includes("PROMOÇÃO")) {
+      return { label: "Promoções & Vendas", icon: "🏷️", badgeColor: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
+    }
+    return { label: "Previsão & Demanda", icon: "📈", badgeColor: "bg-amber-500/15 text-amber-300 border-amber-500/30" };
+  }
+
   function handleRetry() {
     setStatus("loading");
     setAttempt((current) => current + 1);
@@ -331,6 +414,21 @@ export default function InicioPage() {
   const replenishment = data?.replenishment ?? [];
   const stockCount = data?.metrics?.stockAlertsCount ?? 0;
   const updatedAt = data?.updatedAt ?? loadedAt;
+
+  const allInsights: AiInsightItem[] = (data?.aiInsights && data.aiInsights.length > 0)
+    ? data.aiInsights
+    : (data?.aiInsight ? [data.aiInsight] : []);
+
+  const visibleInsights = allInsights.filter((item) => {
+    if (selectedAreaTab !== "TODAS") {
+      const cat = (item.categoria || "").toUpperCase();
+      if (selectedAreaTab === "ESTOQUE" && !cat.includes("ESTOQUE")) return false;
+      if (selectedAreaTab === "EQUIPE" && !cat.includes("EQUIPE")) return false;
+      if (selectedAreaTab === "PROMOCAO" && !cat.includes("PROMOCAO") && !cat.includes("PROMOÇÃO")) return false;
+      if (selectedAreaTab === "PREVISAO" && !cat.includes("PREVISAO") && !cat.includes("PREVISÃO") && !cat.includes("FLUXO")) return false;
+    }
+    return true;
+  });
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
@@ -438,36 +536,26 @@ export default function InicioPage() {
             </div>
           )}
 
-          {/* ITEM 1 & 2 DO RF09: Componente Visual de "Dica da Inteligência Artificial" com Sparkles */}
-          {data.aiInsight && (
-            <section className="mb-6 overflow-hidden rounded-2xl border border-acid/25 bg-gradient-to-r from-acid/[0.08] via-white/[0.03] to-white/[0.01] p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-3.5">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-acid text-ink shadow-sm">
-                    <Icon size={18}>{sparklesPaths}</Icon>
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-acid">
-                        Inteligência Artificial
-                      </span>
-                      {data.aiInsight.impacto && (
-                        <span className="rounded-full bg-acid/15 px-2 py-0.5 text-[10px] font-semibold text-acid">
-                          {data.aiInsight.impacto}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="mt-0.5 text-base font-bold text-white">
-                      {data.aiInsight.title}
-                    </h2>
-                    <p className="mt-2 text-xs sm:text-sm leading-relaxed text-white/80">
-                      {data.aiInsight.text}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
+          {/* Botão Chamar IA — as recomendações aparecem diretamente em cada aba */}
+          <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-5 py-4">
+            <div>
+              <p className="text-sm font-semibold text-white">Recomendações com IA</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Insights personalizados disponíveis em{" "}
+                <span className="text-acid font-medium">Estoque, Equipe, Promoções e Previsões</span>.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isRegeneratingRec}
+              onClick={handleRegenerateAllRecommendations}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-white/10 hover:border-white/30 disabled:opacity-50"
+              title="Forçar novo cálculo do Gemini para todas as 4 áreas da loja"
+            >
+              <span className={isRegeneratingRec ? "inline-block animate-spin" : ""}>↻</span>
+              {isRegeneratingRec ? "Consultando Gemini IA..." : "Recalcular IA"}
+            </button>
+          </div>
 
           {/* Métricas Principais */}
           {data.metrics && (

@@ -1,10 +1,13 @@
 package com.uninassau.demandarecife.products.controller;
 
+import com.uninassau.demandarecife.alerts.repository.OperationalAlertRepository;
 import com.uninassau.demandarecife.forecast.benchmark.MarketBenchmark;
 import com.uninassau.demandarecife.forecast.benchmark.MarketBenchmarkRepository;
 import com.uninassau.demandarecife.inventory.repository.InventoryRepository;
 import com.uninassau.demandarecife.products.entity.Product;
 import com.uninassau.demandarecife.products.repository.ProductRepository;
+import com.uninassau.demandarecife.promotions.repository.PromotionalCampaignRepository;
+import com.uninassau.demandarecife.sales.repository.SalesRepository;
 import com.uninassau.demandarecife.shared.tenant.CurrentTenant;
 import com.uninassau.demandarecife.tenants.entity.Tenant;
 import com.uninassau.demandarecife.tenants.repository.TenantRepository;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,7 +25,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +44,15 @@ class ProductControllerTest {
 
     @Mock
     private InventoryRepository inventoryRepository;
+
+    @Mock
+    private SalesRepository salesRepository;
+
+    @Mock
+    private OperationalAlertRepository operationalAlertRepository;
+
+    @Mock
+    private PromotionalCampaignRepository promotionalCampaignRepository;
 
     @Mock
     private CurrentTenant currentTenant;
@@ -150,5 +165,74 @@ class ProductControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).hasSize(1);
         assertThat(response.getBody().getFirst().nome()).isEqualTo("Pão Francês Tradicional");
+    }
+
+    @Test
+    @DisplayName("Deve remover produto e limpar relacionamentos com sucesso")
+    void deveRemoverProdutoComSucesso() {
+        UUID tenantId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        when(currentTenant.id()).thenReturn(tenantId);
+
+        Product p = new Product();
+        p.setId(productId);
+        p.setTenantId(tenantId);
+        p.setNome("Burger Smash");
+
+        when(productRepository.findByIdAndTenantId(productId, tenantId)).thenReturn(Optional.of(p));
+
+        var response = controller.deleteProduct(productId);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        verify(salesRepository).deleteByTenantIdAndProductId(tenantId, productId);
+        verify(inventoryRepository).deleteByTenantIdAndProductId(tenantId, productId);
+        verify(operationalAlertRepository).deleteByTenantIdAndProductId(tenantId, productId);
+        verify(promotionalCampaignRepository).deleteByTenantIdAndProductId(tenantId, productId);
+        verify(productRepository).delete(p);
+    }
+
+    @Test
+    @DisplayName("Deve lançar 404 ao tentar remover produto que não pertence ao tenant")
+    void deveRetornar404AoRemoverProdutoInexistente() {
+        UUID tenantId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        when(currentTenant.id()).thenReturn(tenantId);
+
+        when(productRepository.findByIdAndTenantId(productId, tenantId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.deleteProduct(productId))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    @DisplayName("Deve calcular status do starter kit e identificar pendentes")
+    void deveCalcularStatusDoStarterKit() {
+        UUID tenantId = UUID.randomUUID();
+        when(currentTenant.id()).thenReturn(tenantId);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setNichoAtuacao("padaria");
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var b1 = new MarketBenchmark("padaria", "pao frances", "Pão Francês", "Panificação",
+                new BigDecimal("0.85"), new BigDecimal("320.00"), "UN", true);
+        var b2 = new MarketBenchmark("padaria", "croissant", "Croissant", "Panificação",
+                new BigDecimal("4.50"), new BigDecimal("40.00"), "UN", true);
+        when(benchmarkRepository.findByNichoAndDestaqueCatalogoTrue("padaria")).thenReturn(List.of(b1, b2));
+
+        Product p1 = new Product();
+        p1.setNome("Pão Francês");
+        when(productRepository.findByTenantId(tenantId)).thenReturn(List.of(p1));
+
+        var statusResponse = controller.getStarterKitStatus(null);
+
+        assertThat(statusResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        var status = statusResponse.getBody();
+        assertThat(status).isNotNull();
+        assertThat(status.totalSuggestions()).isEqualTo(2);
+        assertThat(status.alreadyAdded()).isEqualTo(1);
+        assertThat(status.pending()).isEqualTo(1);
+        assertThat(status.applied()).isFalse();
     }
 }

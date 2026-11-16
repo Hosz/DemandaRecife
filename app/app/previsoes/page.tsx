@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccessToken, clearAuthSession } from "../lib/auth";
 import { DashboardSkeleton } from "../components/DashboardSkeleton";
+import { AiInsightBanner } from "../components/AiInsightBanner";
 import { fetchIntegrationsStatus, type IntegrationsStatus } from "../lib/api";
 
 type ForecastItem = {
@@ -420,6 +421,9 @@ export default function PrevisoesPage() {
             {loading ? "Atualizando..." : "↻ Atualizar previsões"}
           </button>
         </header>
+
+        {/* Insight IA — Previsão */}
+        <AiInsightBanner category="PREVISAO" />
 
         <section className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>

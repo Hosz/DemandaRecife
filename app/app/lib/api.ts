@@ -484,6 +484,14 @@ export type BenchmarkSuggestion = {
   precoSugerido: number;
   mediaDiaria: number;
   unidade?: string;
+  jaAdicionado?: boolean;
+};
+
+export type StarterKitStatus = {
+  applied: boolean;
+  totalSuggestions: number;
+  alreadyAdded: number;
+  pending: number;
 };
 
 export async function fetchProducts(): Promise<ProductItem[]> {
@@ -529,6 +537,33 @@ export async function addStarterKit(ids?: string[], nicho?: string): Promise<Pro
     // fallback
   }
   return [];
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/products/${id}`, withAuth({
+      method: "DELETE",
+    }));
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchStarterKitStatus(nicho?: string): Promise<StarterKitStatus | null> {
+  try {
+    const query = nicho ? `?nicho=${encodeURIComponent(nicho)}` : "";
+    const res = await fetch(
+      `${API_URL}/api/products/starter-kit/status${query}`,
+      withAuth({ cache: "no-store" }),
+    );
+    if (res.ok) {
+      return (await res.json()) as StarterKitStatus;
+    }
+  } catch {
+    // fallback
+  }
+  return null;
 }
 
 export type ReplenishmentSuggestionDto = {
@@ -759,6 +794,7 @@ export async function deleteShift(id: string): Promise<boolean> {
 export type CampaignItem = {
   id: string;
   productId?: string;
+  productIds?: string[];
   titulo: string;
   detalhe?: string;
   descontoPercentual?: number;
@@ -766,11 +802,14 @@ export type CampaignItem = {
   status: "Ativa" | "Agendada" | "Pausada" | "Encerrada" | string;
   data: string;
   dataFim?: string;
+  horarioInicio?: string;
+  horarioFim?: string;
   eventoVinculado?: string;
 };
 
 export type CreateCampaignRequest = {
   productId?: string;
+  productIds?: string[];
   titulo: string;
   detalhe?: string;
   descontoPercentual: number;
@@ -778,6 +817,8 @@ export type CreateCampaignRequest = {
   status?: string;
   data?: string;
   dataFim?: string;
+  horarioInicio?: string;
+  horarioFim?: string;
   eventoVinculado?: string;
 };
 
@@ -833,8 +874,11 @@ export async function updateCampaign(id: string, req: CreateCampaignRequest): Pr
 
 export async function deleteCampaign(id: string): Promise<boolean> {
   try {
+    if (!id || !id.includes("-")) {
+      return true;
+    }
     const res = await fetch(`${API_URL}/api/promotions/campaigns/${id}`, withAuth({ method: "DELETE" }));
-    return res.ok;
+    return res.ok || res.status === 404;
   } catch {
     return false;
   }

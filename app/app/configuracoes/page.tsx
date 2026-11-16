@@ -8,7 +8,7 @@ import {
   type OnboardingData,
 } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
-import { DashboardSkeleton } from "../components/DashboardSkeleton";
+import { SEGMENT_CATEGORIES, ALL_SEGMENT_OPTIONS } from "../lib/segments";
 
 const RECIFE_BAIRROS = [
   "Boa Viagem",
@@ -47,8 +47,6 @@ const RECIFE_BAIRROS = [
   "Tejipió",
   "Outro",
 ];
-
-import { SEGMENT_CATEGORIES, ALL_SEGMENT_OPTIONS } from "../lib/segments";
 
 export default function ConfiguracoesPage() {
   const { showToast } = useToast();
@@ -169,14 +167,6 @@ export default function ConfiguracoesPage() {
       showToast("error", res.message || "Erro ao salvar configurações.");
     }
   };
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-8 sm:py-10">
-        <DashboardSkeleton />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#111214] text-white">

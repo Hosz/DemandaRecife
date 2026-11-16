@@ -47,7 +47,7 @@ class DailyBriefingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DailyBriefingService(alertService, replenishmentService, forecastService, productRepository, weatherFinder, tenantFinder, salesRepository);
+        service = new DailyBriefingService(alertService, replenishmentService, forecastService, productRepository, weatherFinder, tenantFinder, salesRepository, null);
         pao = new Product();
         pao.setId(UUID.randomUUID());
         pao.setNome("Pão Francês");

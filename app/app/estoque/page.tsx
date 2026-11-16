@@ -7,13 +7,17 @@ import {
   fetchAlerts,
   resolveAlert,
   addStarterKit,
+  deleteProduct,
+  fetchStarterKitStatus,
   getTenantSettings,
   type ReplenishmentSuggestionDto,
   type OperationalAlertDto,
+  type StarterKitStatus,
 } from "../lib/api";
 import { getTenantId } from "../lib/auth";
 import { useToast } from "../components/ToastProvider";
 import { DashboardSkeleton } from "../components/DashboardSkeleton";
+import { AiInsightBanner } from "../components/AiInsightBanner";
 
 export default function EstoquePage() {
   const { showToast } = useToast();
@@ -23,15 +27,29 @@ export default function EstoquePage() {
   const [search, setSearch] = useState("");
   const [filterRuptureOnly, setFilterRuptureOnly] = useState(false);
   const [isAddingStarterKit, setIsAddingStarterKit] = useState(false);
+  const [starterKitStatus, setStarterKitStatus] = useState<StarterKitStatus | null>(null);
+  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function loadData() {
-      const [items, activeAlerts] = await Promise.all([
+      const id = getTenantId();
+      let tenantNicho: string | undefined;
+      if (id) {
+        const settings = await getTenantSettings(id);
+        if (settings?.nichoAtuacao) {
+          tenantNicho = settings.nichoAtuacao;
+        }
+      }
+
+      const [items, activeAlerts, skStatus] = await Promise.all([
         fetchReplenishmentSuggestions(false),
         fetchAlerts("ATIVO"),
+        fetchStarterKitStatus(tenantNicho),
       ]);
       setStockItems(items);
       setAlerts(activeAlerts);
+      setStarterKitStatus(skStatus);
       setLoading(false);
     }
     void loadData();
@@ -44,6 +62,21 @@ export default function EstoquePage() {
       showToast("success", "Alerta resolvido com sucesso!");
     } else {
       showToast("error", "Não foi possível resolver o alerta.");
+    }
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    const ok = await deleteProduct(productToDelete.id);
+    setIsDeleting(false);
+
+    if (ok) {
+      setStockItems((prev) => prev.filter((item) => item.productId !== productToDelete.id));
+      showToast("success", `Produto "${productToDelete.name}" removido do inventário.`);
+      setProductToDelete(null);
+    } else {
+      showToast("error", `Erro ao remover o produto "${productToDelete.name}".`);
     }
   };
 
@@ -106,6 +139,9 @@ export default function EstoquePage() {
             </Link>
           </div>
         </div>
+
+        {/* Insight IA — Estoque */}
+        <AiInsightBanner category="ESTOQUE" />
 
         {/* Métricas Principais */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -238,33 +274,36 @@ export default function EstoquePage() {
               </p>
               {stockItems.length === 0 && (
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    disabled={isAddingStarterKit}
-                    onClick={async () => {
-                      setIsAddingStarterKit(true);
-                      const id = getTenantId();
-                      let tenantNicho: string | undefined;
-                      if (id) {
-                        const settings = await getTenantSettings(id);
-                        if (settings?.nichoAtuacao) {
-                          tenantNicho = settings.nichoAtuacao;
+                  {!starterKitStatus?.applied && (
+                    <button
+                      type="button"
+                      disabled={isAddingStarterKit}
+                      onClick={async () => {
+                        setIsAddingStarterKit(true);
+                        const id = getTenantId();
+                        let tenantNicho: string | undefined;
+                        if (id) {
+                          const settings = await getTenantSettings(id);
+                          if (settings?.nichoAtuacao) {
+                            tenantNicho = settings.nichoAtuacao;
+                          }
                         }
-                      }
-                      const res = await addStarterKit(undefined, tenantNicho);
-                      setIsAddingStarterKit(false);
-                      if (res && res.length > 0) {
-                        showToast("success", "Itens padrão do segmento adicionados ao estoque!");
-                        const items = await fetchReplenishmentSuggestions(false);
-                        setStockItems(items);
-                      } else {
-                        showToast("error", "Não foi possível adicionar os itens do segmento.");
-                      }
-                    }}
-                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-indigo-500 transition disabled:opacity-50"
-                  >
-                    {isAddingStarterKit ? "Adicionando..." : "⚡ Adicionar itens comuns do segmento"}
-                  </button>
+                        const res = await addStarterKit(undefined, tenantNicho);
+                        setIsAddingStarterKit(false);
+                        if (res && res.length > 0) {
+                          showToast("success", "Itens padrão do segmento adicionados ao estoque!");
+                          const items = await fetchReplenishmentSuggestions(false);
+                          setStockItems(items);
+                          setStarterKitStatus({ applied: true, totalSuggestions: res.length, alreadyAdded: res.length, pending: 0 });
+                        } else {
+                          showToast("error", "Não foi possível adicionar os itens do segmento.");
+                        }
+                      }}
+                      className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-indigo-500 transition disabled:opacity-50"
+                    >
+                      {isAddingStarterKit ? "Adicionando..." : "⚡ Adicionar itens comuns do segmento"}
+                    </button>
+                  )}
                   <Link
                     href="/dados"
                     className="inline-block rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20 transition"
@@ -284,6 +323,7 @@ export default function EstoquePage() {
                     <th className="py-3.5 px-4 font-semibold text-center">Mín / Máx</th>
                     <th className="py-3.5 px-4 font-semibold">Nível de Cobertura</th>
                     <th className="py-3.5 px-4 font-semibold text-right">Ação Sugerida</th>
+                    <th className="py-3.5 px-4 font-semibold text-center w-24">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-xs">
@@ -341,6 +381,20 @@ export default function EstoquePage() {
                             </span>
                           )}
                         </td>
+
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setProductToDelete({ id: item.productId, name: item.produto })}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-400 hover:bg-red-500/20 hover:text-red-300 transition"
+                            title="Remover produto do inventário"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Excluir</span>
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -349,6 +403,50 @@ export default function EstoquePage() {
             </div>
           )}
         </section>
+
+        {/* Modal de Confirmação de Exclusão de Produto */}
+        {productToDelete && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          >
+            <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[#16171a] p-6 shadow-2xl animate-in fade-in zoom-in-95">
+              <div className="flex items-center gap-3 text-red-400 mb-3">
+                <span className="grid size-9 place-items-center rounded-xl bg-red-500/15 text-lg">
+                  ⚠️
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white">Remover do Inventário</h3>
+                  <p className="text-xs text-[#8e8f94]">Confirmação de exclusão física</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#c4c5c9] leading-relaxed mb-4">
+                Tem certeza que deseja remover o produto <strong className="text-white">"{productToDelete.name}"</strong>? Os níveis de estoque, compras e alertas deste item serão excluídos do sistema.
+              </p>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.08]">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setProductToDelete(null)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteConfirmed}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-red-950/40 hover:bg-red-500 transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeleting ? "Removendo..." : "Sim, remover item"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
