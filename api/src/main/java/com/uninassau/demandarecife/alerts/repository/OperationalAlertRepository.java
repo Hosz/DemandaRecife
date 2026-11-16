@@ -71,4 +71,8 @@ public interface OperationalAlertRepository extends JpaRepository<OperationalAle
     default int resolverAlerta(UUID id, UUID tenantId, LocalDateTime dataResolucao) {
         return atualizarStatus(id, tenantId, AlertStatus.ATIVO, AlertStatus.RESOLVIDO, dataResolucao);
     }
+
+    @Modifying
+    @Query("DELETE FROM OperationalAlert a WHERE a.tenantId = :tenantId AND a.productId = :productId")
+    void deleteByTenantIdAndProductId(@Param("tenantId") UUID tenantId, @Param("productId") UUID productId);
 }

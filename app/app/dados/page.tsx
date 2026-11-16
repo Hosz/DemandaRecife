@@ -97,11 +97,17 @@ export default function DadosPage() {
 
     if (updated && updated.length > 0) {
       setProducts(updated.map((p) => ({ id: p.id, name: p.nome })));
+      // Atualiza lista de sugestões para refletir que foram adicionadas
+      const freshSuggestions = await fetchBenchmarkSuggestions(tenantNicho);
+      setSuggestions(freshSuggestions || []);
       showToast("success", "Produtos de referência adicionados ao seu catálogo com sucesso!");
     } else {
       showToast("error", "Não foi possível adicionar os produtos sugeridos.");
     }
   }
+
+  const pendingSuggestions = suggestions.filter((s) => !s.jaAdicionado);
+  const showStarterKitBanner = suggestions.length > 0 && pendingSuggestions.length > 0;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
@@ -117,7 +123,7 @@ export default function DadosPage() {
       </header>
 
       {/* Banner de Benchmarks / Sugestão de Catálogo (RF07 Cold Start) */}
-      {suggestions.length > 0 && (
+      {showStarterKitBanner && (
         <section className="panel mb-6 border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 via-background to-background p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -128,18 +134,26 @@ export default function DadosPage() {
                 <h3 className="text-sm font-semibold text-white">Catálogo de Referência do seu Segmento</h3>
               </div>
               <p className="mt-1 text-xs text-muted">
-                Adicione com 1 clique os produtos de maior giro do seu setor no Grande Recife para iniciar seu catálogo e alimentar previsões imediatas.
+                Adicione com 1 clique os produtos de maior giro do seu setor no Grande Recife ({pendingSuggestions.length} restante{pendingSuggestions.length > 1 ? "s" : ""}) para alimentar previsões imediatas.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {suggestions.map((s) => (
                   <span
                     key={s.id}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-surface px-2.5 py-1 text-xs font-medium text-foreground"
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                      s.jaAdicionado
+                        ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-300"
+                        : "border-border/80 bg-surface text-foreground"
+                    }`}
                   >
                     <span>{s.nomeSugerido}</span>
-                    <span className="text-[10px] text-muted font-normal">
-                      (~{s.mediaDiaria} {s.unidade || "un"}/dia)
-                    </span>
+                    {s.jaAdicionado ? (
+                      <span className="text-[10px] text-emerald-400 font-semibold">✓ Adicionado</span>
+                    ) : (
+                      <span className="text-[10px] text-muted font-normal">
+                        (~{s.mediaDiaria} {s.unidade || "un"}/dia)
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>
@@ -150,7 +164,7 @@ export default function DadosPage() {
               onClick={handleApplyStarterKit}
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
             >
-              {isAddingStarterKit ? "Adicionando..." : "Adicionar itens sugeridos"}
+              {isAddingStarterKit ? "Adicionando..." : `Adicionar itens sugeridos (${pendingSuggestions.length})`}
             </button>
           </div>
         </section>

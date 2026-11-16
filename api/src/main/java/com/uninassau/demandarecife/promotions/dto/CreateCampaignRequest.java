@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 public record CreateCampaignRequest(
@@ -24,10 +25,21 @@ public record CreateCampaignRequest(
         @Size(max = 50, message = "A data fim deve ter no máximo 50 caracteres")
         String dataFim,
         @Size(max = 150, message = "O evento deve ter no máximo 150 caracteres")
-        String eventoVinculado
+        String eventoVinculado,
+        @Size(max = 20, message = "O horário de início deve ter no máximo 20 caracteres")
+        String horarioInicio,
+        @Size(max = 20, message = "O horário de término deve ter no máximo 20 caracteres")
+        String horarioFim,
+        List<UUID> productIds
 ) {
     public CreateCampaignRequest(UUID productId, String titulo, String detalhe,
                                  int descontoPercentual, BigDecimal precoPromocional, String status, String data) {
-        this(productId, titulo, detalhe, descontoPercentual, precoPromocional, status, data, null, null);
+        this(productId, titulo, detalhe, descontoPercentual, precoPromocional, status, data, null, null, null, null, null);
+    }
+
+    public CreateCampaignRequest(UUID productId, String titulo, String detalhe,
+                                 int descontoPercentual, BigDecimal precoPromocional, String status,
+                                 String data, String dataFim, String eventoVinculado) {
+        this(productId, titulo, detalhe, descontoPercentual, precoPromocional, status, data, dataFim, eventoVinculado, null, null, null);
     }
 }
