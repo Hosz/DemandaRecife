@@ -1,9 +1,26 @@
 # Demanda Recife
 
-API para previsão de demanda, estoque, vendas, promoções e operação de pequenos
+API e aplicação web para previsão de demanda, estoque, vendas, promoções e operação de pequenos
 negócios.
 
-## Banco de dados
+## Estrutura e Tecnologias
+
+- **`api/`**: Back-end em Java com Spring Boot e PostgreSQL (migrations em Flyway).
+- **`app/`**: Front-end em Next.js (App Router), React, TypeScript e Tailwind CSS.
+
+## Pré-requisitos
+
+- Docker e Docker Compose
+- Java (JDK) para rodar a API via Maven Wrapper (`mvnw` / `mvnw.cmd`)
+- Node.js e npm para rodar o front-end
+
+## Como executar
+
+### 1. Variáveis de ambiente
+
+Copie o arquivo de exemplo [`api/.env.example`](file:///c:/Users/adry4/OneDrive/Documentos/Estudos/Full-Stack/DemandaRecife/api/.env.example) para `api/.env` e preencha as variáveis necessárias (`GEMINI_API_KEY`, `OPENWEATHER_API_KEY`, `GOOGLE_CALENDAR_API_KEY`, `DB_USER`, `DB_PASSWORD`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` e `VAPID_SUBJECT`).
+
+### 2. Banco de dados
 
 O banco foi subido em **PostgreSQL executando no Docker**, com os seguintes
 parâmetros usados pela API:
@@ -14,7 +31,13 @@ parâmetros usados pela API:
 - Usuário padrão: `postgres`
 - Senha padrão: `postgres`
 
-Exemplo para subir o banco:
+Exemplo para subir o banco com Docker Compose (usando [`docker-compose.yml`](file:///c:/Users/adry4/OneDrive/Documentos/Estudos/Full-Stack/DemandaRecife/docker-compose.yml)):
+
+```bash
+docker compose up -d
+```
+
+Ou manualmente via `docker run`:
 
 ```bash
 docker run --name demanda-recife-postgres \
@@ -39,6 +62,33 @@ psql -h localhost -p 5432 -U postgres -d demandafacil \
 O script consolidado inclui a extensão `pgcrypto`, as tabelas, índices, views
 materializadas, constraints, dados iniciais de benchmarks e alterações das
 migrations V1 até V17. Ele é executado em uma única transação.
+
+### 3. Back-end (`api/`)
+
+Na pasta `api/`, execute:
+
+```bash
+# Linux / macOS
+./mvnw spring-boot:run
+
+# Windows (PowerShell / CMD)
+.\mvnw.cmd spring-boot:run
+```
+
+A API ficará disponível em `http://localhost:8080`.
+
+### 4. Front-end (`app/`)
+
+Na pasta `app/`, instale as dependências e inicie o servidor de desenvolvimento:
+
+```bash
+npm install
+npm run dev
+```
+
+A aplicação web ficará disponível em `http://localhost:3000`.
+
+Principais páginas da interface: `/login`, `/cadastro`, `/registro`, `/onboarding`, `/estoque`, `/compras`, `/previsoes`, `/promocoes`, `/equipe`, `/dados` e `/configuracoes`.
 
 ## API
 
