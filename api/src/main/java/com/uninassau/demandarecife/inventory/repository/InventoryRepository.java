@@ -32,4 +32,8 @@ public interface InventoryRepository extends JpaRepository<InventoryLevel, UUID>
     // Quais negócios têm estoque cadastrado (o job só varre esses)
     @Query("SELECT DISTINCT i.tenantId FROM InventoryLevel i")
     List<UUID> findTenantIdsWithInventory();
+
+    @Modifying
+    @Query("DELETE FROM InventoryLevel i WHERE i.tenantId = :tenantId AND i.productId = :productId")
+    void deleteByTenantIdAndProductId(@Param("tenantId") UUID tenantId, @Param("productId") UUID productId);
 }

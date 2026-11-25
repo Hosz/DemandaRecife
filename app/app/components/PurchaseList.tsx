@@ -54,6 +54,7 @@ export function PurchaseList() {
   const [tenantNicho, setTenantNicho] = useState<string>("");
   const [filterMode, setFilterMode] = useState<"todos" | "urgentes" | "comprados">("todos");
   const [showFormulaInfo, setShowFormulaInfo] = useState(false);
+  const [catalogCount, setCatalogCount] = useState<number>(0);
 
   useEffect(() => {
     async function loadData() {
@@ -67,6 +68,7 @@ export function PurchaseList() {
       }
 
       const suggestions = await fetchReplenishmentSuggestions(false);
+      setCatalogCount(suggestions ? suggestions.length : 0);
       if (suggestions && suggestions.length > 0) {
         const mapped: PurchaseItem[] = suggestions.map((s: ReplenishmentSuggestionDto) => {
           let when: Urgency = "semana";
@@ -400,14 +402,14 @@ export function PurchaseList() {
           </h2>
 
           <p className="mx-auto mt-2 max-w-lg text-xs sm:text-sm text-muted leading-relaxed">
-            {items.length === 0
+            {catalogCount === 0
               ? `Seu negócio ainda não possui itens no catálogo de estoque. Você pode adicionar os insumos recomendados para ${
                   tenantNicho ? `o segmento "${tenantNicho}"` : "o seu negócio"
                 } com 1 clique para ativar o cálculo de reposição automática.`
               : "Todas as compras foram finalizadas ou seus níveis de estoque atuais cobrem a demanda prevista com segurança."}
           </p>
 
-          {items.length === 0 && (
+          {catalogCount === 0 && (
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"

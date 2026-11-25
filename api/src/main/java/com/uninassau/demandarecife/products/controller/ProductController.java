@@ -1,5 +1,6 @@
 package com.uninassau.demandarecife.products.controller;
 
+import com.uninassau.demandarecife.alerts.repository.OperationalAlertRepository;
 import com.uninassau.demandarecife.forecast.benchmark.DatabaseBenchmarkProvider;
 import com.uninassau.demandarecife.forecast.benchmark.MarketBenchmark;
 import com.uninassau.demandarecife.forecast.benchmark.MarketBenchmarkRepository;
@@ -7,15 +8,20 @@ import com.uninassau.demandarecife.inventory.entity.InventoryLevel;
 import com.uninassau.demandarecife.inventory.repository.InventoryRepository;
 import com.uninassau.demandarecife.products.dto.BenchmarkSuggestionDto;
 import com.uninassau.demandarecife.products.dto.ProductDto;
+import com.uninassau.demandarecife.products.dto.StarterKitStatusDto;
 import com.uninassau.demandarecife.products.entity.Product;
 import com.uninassau.demandarecife.products.repository.ProductRepository;
+import com.uninassau.demandarecife.promotions.repository.PromotionalCampaignRepository;
+import com.uninassau.demandarecife.sales.repository.SalesRepository;
 import com.uninassau.demandarecife.shared.tenant.CurrentTenant;
 import com.uninassau.demandarecife.tenants.entity.Tenant;
 import com.uninassau.demandarecife.tenants.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -34,6 +40,9 @@ public class ProductController {
     private final TenantRepository tenantRepository;
     private final MarketBenchmarkRepository benchmarkRepository;
     private final InventoryRepository inventoryRepository;
+    private final SalesRepository salesRepository;
+    private final OperationalAlertRepository operationalAlertRepository;
+    private final PromotionalCampaignRepository promotionalCampaignRepository;
     private final CurrentTenant currentTenant;
 
     @GetMapping
@@ -49,14 +58,46 @@ public class ProductController {
                 .toList();
     }
 
+    @DeleteMapping("/{id}")
+    @Transactional
+    public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
+        UUID tenantId = currentTenant.id();
+        Product product = productRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto não encontrado"));
+
+        // Remove transações de vendas do produto para respeitar a FK
+        salesRepository.deleteByTenantIdAndProductId(tenantId, id);
+
+        // Remove nível de inventário
+        inventoryRepository.deleteByTenantIdAndProductId(tenantId, id);
+
+        // Remove alertas operacionais associados ao produto
+        operationalAlertRepository.deleteByTenantIdAndProductId(tenantId, id);
+
+        // Remove campanhas promocionais atreladas
+        promotionalCampaignRepository.deleteByTenantIdAndProductId(tenantId, id);
+
+        // Deleta o produto
+        productRepository.delete(product);
+
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/benchmarks/suggestions")
     public List<BenchmarkSuggestionDto> getBenchmarkSuggestions(@RequestParam(required = false) String nicho) {
-        UUID tenantId = currentTenant.id();
-        String nichoEfetivo = (nicho != null && !nicho.isBlank())
-                ? nicho
-                : tenantRepository.findById(tenantId)
-                        .map(Tenant::getNichoAtuacao)
-                        .orElse("geral");
+        UUID tenantId = null;
+        try {
+            tenantId = currentTenant.id();
+        } catch (Exception ignored) {}
+
+        String nichoEfetivo = "geral";
+        if (nicho != null && !nicho.isBlank()) {
+            nichoEfetivo = nicho;
+        } else if (tenantId != null) {
+            nichoEfetivo = tenantRepository.findById(tenantId)
+                    .map(Tenant::getNichoAtuacao)
+                    .orElse("geral");
+        }
 
         String nichoNormalizado = DatabaseBenchmarkProvider.normalizarNicho(nichoEfetivo);
         List<MarketBenchmark> suggestions = benchmarkRepository.findByNichoAndDestaqueCatalogoTrue(nichoNormalizado);
@@ -64,6 +105,16 @@ public class ProductController {
             suggestions = benchmarkRepository.findByNicho(nichoNormalizado);
         }
 
+        Set<String> existingNames = Set.of();
+        if (tenantId != null) {
+            try {
+                existingNames = productRepository.findByTenantId(tenantId).stream()
+                        .map(p -> p.getNome().trim().toLowerCase())
+                        .collect(Collectors.toSet());
+            } catch (Exception ignored) {}
+        }
+
+        final Set<String> nomesSet = existingNames;
         return suggestions.stream()
                 .map(b -> new BenchmarkSuggestionDto(
                         b.getId(),
@@ -71,9 +122,20 @@ public class ProductController {
                         b.getCategoria(),
                         b.getPrecoSugerido(),
                         b.getMediaDiaria(),
-                        b.getUnidade()
+                        b.getUnidade(),
+                        nomesSet.contains(b.getNomeSugerido().trim().toLowerCase())
                 ))
                 .toList();
+    }
+
+    @GetMapping("/starter-kit/status")
+    public ResponseEntity<StarterKitStatusDto> getStarterKitStatus(@RequestParam(required = false) String nicho) {
+        List<BenchmarkSuggestionDto> suggestions = getBenchmarkSuggestions(nicho);
+        int total = suggestions.size();
+        int alreadyAdded = (int) suggestions.stream().filter(BenchmarkSuggestionDto::jaAdicionado).count();
+        int pending = total - alreadyAdded;
+        boolean applied = total > 0 && pending == 0;
+        return ResponseEntity.ok(new StarterKitStatusDto(applied, total, alreadyAdded, pending));
     }
 
     @PostMapping("/starter-kit")

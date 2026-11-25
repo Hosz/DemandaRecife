@@ -13,6 +13,11 @@ import {
   deleteShift,
   type TeamMemberItem,
 } from "../lib/api";
+import {
+  fetchDailyRecommendations,
+  applyRecommendation,
+  type AiInsightItem,
+} from "../lib/dashboard";
 
 type WeekDay = {
   label: string;
@@ -56,7 +61,13 @@ export default function EquipePage() {
   const [selectedDay, setSelectedDay] = useState(todayLabel);
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([]);
   const [shifts, setShifts] = useState<Turno[]>([]);
-  const [isSuggestionApplied, setIsSuggestionApplied] = useState(false);
+  const [, setLoadingShifts] = useState<boolean>(true);
+
+  // Insight Real da IA para Equipe
+  const [equipeInsight, setEquipeInsight] = useState<AiInsightItem | null>(null);
+  const [loadingInsight, setLoadingInsight] = useState<boolean>(true);
+  const [isAiApplied, setIsAiApplied] = useState<boolean>(false);
+  const [highlightedShiftId, setHighlightedShiftId] = useState<string | null>(null);
 
   // Modal para gerenciar equipe
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -72,6 +83,28 @@ export default function EquipePage() {
     void loadMembers();
   }, []);
 
+  // Carrega recomendação diária da IA para categoria EQUIPE
+  useEffect(() => {
+    let ignore = false;
+    async function loadInsight() {
+      const recs = await fetchDailyRecommendations();
+      if (!ignore) {
+        const match = (recs || []).find((r) => r.categoria === "EQUIPE");
+        if (match) {
+          setEquipeInsight(match);
+          if (match.status === "APLICADO") {
+            setIsAiApplied(true);
+          }
+        }
+        setLoadingInsight(false);
+      }
+    }
+    void loadInsight();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   // Extrai o nome curto do dia (ex: "Seg", "Ter") para a API
   const selectedShortDay = useMemo(() => {
     return selectedDay.split(" ")[0];
@@ -79,32 +112,113 @@ export default function EquipePage() {
 
   // Carrega os turnos do dia selecionado
   useEffect(() => {
+    let ignore = false;
     async function loadDayShifts() {
+      setLoadingShifts(true);
       const apiShifts = await fetchShifts(selectedShortDay);
-      if (apiShifts && apiShifts.length > 0) {
-        setShifts(
-          apiShifts.map((s) => ({
-            id: s.id || String(Math.random()),
-            horario: s.horario,
-            horarioInicio: s.horarioInicio,
-            horarioFim: s.horarioFim,
-            demanda: s.demanda,
-            tipoDemanda: s.tipoDemanda,
-            funcionarios: s.funcionarios || [],
-            vagaPendente: Boolean(s.vagaPendente),
-            funcao: s.funcao || "Geral",
-            intervalo: s.intervalo,
-            observacoes: s.observacoes,
-          })),
-        );
-      } else {
-        // Se ainda não houver turnos cadastrados no banco para o dia, inicia com estrutura limpa
-        setShifts([]);
+      if (!ignore) {
+        if (apiShifts && apiShifts.length > 0) {
+          setShifts(
+            apiShifts.map((s) => ({
+              id: s.id || String(Math.random()),
+              horario: s.horario,
+              horarioInicio: s.horarioInicio,
+              horarioFim: s.horarioFim,
+              demanda: s.demanda,
+              tipoDemanda: s.tipoDemanda,
+              funcionarios: s.funcionarios || [],
+              vagaPendente: Boolean(s.vagaPendente),
+              funcao: s.funcao || "Geral",
+              intervalo: s.intervalo,
+              observacoes: s.observacoes,
+            })),
+          );
+        } else {
+          setShifts([]);
+        }
+        setLoadingShifts(false);
       }
-      setIsSuggestionApplied(false);
     }
     void loadDayShifts();
+    return () => {
+      ignore = true;
+    };
   }, [selectedShortDay]);
+
+  // Parâmetros inferidos da sugestão de IA
+  const suggestedTimeRange = useMemo(() => {
+    let inicio = "17:00";
+    let fim = "21:00";
+
+    if (equipeInsight?.payloadAcao?.horarioInicio && typeof equipeInsight.payloadAcao.horarioInicio === "string") {
+      inicio = equipeInsight.payloadAcao.horarioInicio;
+    }
+    if (equipeInsight?.payloadAcao?.horarioFim && typeof equipeInsight.payloadAcao.horarioFim === "string") {
+      fim = equipeInsight.payloadAcao.horarioFim;
+    }
+
+    const fullText = `${equipeInsight?.acaoSugerida || ""} ${equipeInsight?.title || ""} ${equipeInsight?.diagnostico || ""}`;
+    const timeMatch = fullText.match(/(\d{1,2})(?:[h:](\d{2}))?\s*(?:às|as|a|até|-|–)\s*(\d{1,2})(?:[h:](\d{2}))?/i);
+    if (timeMatch && (!equipeInsight?.payloadAcao?.horarioInicio || !equipeInsight?.payloadAcao?.horarioFim)) {
+      const h1 = parseInt(timeMatch[1], 10);
+      const m1 = timeMatch[2] ? timeMatch[2] : "00";
+      const h2 = parseInt(timeMatch[3], 10);
+      const m2 = timeMatch[4] ? timeMatch[4] : "00";
+      if (h1 >= 0 && h1 <= 23 && h2 >= 0 && h2 <= 23) {
+        inicio = `${String(h1).padStart(2, "0")}:${m1}`;
+        fim = `${String(h2).padStart(2, "0")}:${m2}`;
+      }
+    }
+
+    return { inicio, fim };
+  }, [equipeInsight]);
+
+  const suggestedRole = useMemo(() => {
+    if (equipeInsight?.payloadAcao?.funcao && typeof equipeInsight.payloadAcao.funcao === "string") {
+      return equipeInsight.payloadAcao.funcao;
+    }
+    const fullText = `${equipeInsight?.title || ""} ${equipeInsight?.diagnostico || ""} ${equipeInsight?.acaoSugerida || ""}`.toLowerCase();
+    if (fullText.includes("caixa")) return "Caixa / Operador";
+    if (fullText.includes("cozinha") || fullText.includes("produção")) return "Cozinha / Produção";
+    if (fullText.includes("estoque") || fullText.includes("reposi")) return "Reposição / Estoque";
+    return "Atendimento / Balcão";
+  }, [equipeInsight]);
+
+  const suggestedCollaborator = useMemo(() => {
+    if (equipeInsight?.payloadAcao?.funcionario && typeof equipeInsight.payloadAcao.funcionario === "string") {
+      const found = teamMembers.find((m) => m.nome.toLowerCase() === (equipeInsight.payloadAcao?.funcionario as string).toLowerCase());
+      if (found) return found.nome;
+      return equipeInsight.payloadAcao.funcionario as string;
+    }
+
+    const matchedShift = shifts.find(
+      (s) =>
+        s.vagaPendente ||
+        s.tipoDemanda === "alta" ||
+        s.horario.includes(suggestedTimeRange.inicio.slice(0, 2)),
+    );
+
+    if (teamMembers.length > 0) {
+      const freeMember = teamMembers.find((m) => !matchedShift?.funcionarios.includes(m.nome));
+      if (freeMember) return freeMember.nome;
+      return teamMembers[0].nome;
+    }
+
+    return "Reforço Temporário (Diarista)";
+  }, [equipeInsight, teamMembers, shifts, suggestedTimeRange]);
+
+  const aiSuggestedShiftData = useMemo(() => {
+    if (!equipeInsight) return null;
+    return {
+      horarioInicio: suggestedTimeRange.inicio,
+      horarioFim: suggestedTimeRange.fim,
+      demanda: "Demanda alta (Pico da IA)",
+      tipoDemanda: "alta" as const,
+      funcao: suggestedRole,
+      intervalo: "15 min (lanche)",
+      observacoes: `Reforço indicado pela IA para cobrir o pico das ${suggestedTimeRange.inicio} às ${suggestedTimeRange.fim}.`,
+    };
+  }, [equipeInsight, suggestedTimeRange, suggestedRole]);
 
   // Atualiza um turno e salva no backend
   async function handleUpdateShift(shiftId: string, updated: Partial<Turno>) {
@@ -114,7 +228,7 @@ export default function EquipePage() {
     const shiftToSave = updatedList.find((s) => s.id === shiftId);
     if (shiftToSave) {
       await saveShift({
-        id: shiftToSave.id.includes("-") ? shiftToSave.id : undefined, // UUID check
+        id: shiftToSave.id.includes("-") ? shiftToSave.id : undefined,
         diaSemana: selectedShortDay,
         horario: shiftToSave.horario,
         horarioInicio: shiftToSave.horarioInicio,
@@ -179,35 +293,90 @@ export default function EquipePage() {
     showToast("success", "Turno removido.");
   }
 
-  // Aplica recomendação da IA
-  async function handleApplyAiSuggestion() {
-    let applied = false;
-    const updated = shifts.map((s) => {
-      if (s.tipoDemanda === "alta" && !applied) {
-        applied = true;
-        const reforco = teamMembers.length > 0 ? teamMembers[0].nome : "Reforço";
-        const funcs = s.funcionarios.includes(reforco) ? s.funcionarios : [...s.funcionarios, reforco];
-        return { ...s, funcionarios: funcs, vagaPendente: false };
-      }
-      return s;
-    });
+  // Aplica recomendação real da IA
+  async function handleAplicarSugestaoIA() {
+    if (!equipeInsight) return;
 
-    setShifts(updated);
-    setIsSuggestionApplied(true);
+    const targetCollaborator = suggestedCollaborator;
+    const { inicio, fim } = suggestedTimeRange;
+    const formattedHorario = `${inicio.replace(":", "h")}–${fim.replace(":", "h")}`;
 
-    const shiftAlta = updated.find((s) => s.tipoDemanda === "alta");
-    if (shiftAlta) {
-      await saveShift({
-        id: shiftAlta.id.includes("-") ? shiftAlta.id : undefined,
-        diaSemana: selectedShortDay,
-        horario: shiftAlta.horario,
-        demanda: shiftAlta.demanda,
-        tipoDemanda: shiftAlta.tipoDemanda,
+    // 1. Procura turno existente com vaga pendente, demanda alta ou horário compatível
+    const targetShift =
+      shifts.find((s) => equipeInsight.payloadAcao?.shiftId && s.id === equipeInsight.payloadAcao.shiftId) ||
+      shifts.find((s) => s.vagaPendente) ||
+      shifts.find((s) => s.tipoDemanda === "alta") ||
+      shifts.find((s) => s.horario.includes(inicio.slice(0, 2)));
+
+    let affectedShiftId = "";
+
+    if (targetShift) {
+      affectedShiftId = targetShift.id;
+      const currentFuncs = targetShift.funcionarios || [];
+      const updatedFuncs = currentFuncs.includes(targetCollaborator)
+        ? currentFuncs
+        : [...currentFuncs, targetCollaborator];
+
+      await handleUpdateShift(targetShift.id, {
+        funcionarios: updatedFuncs,
         vagaPendente: false,
-        funcionarios: shiftAlta.funcionarios,
+        tipoDemanda: "alta",
+        demanda: targetShift.demanda || "Demanda alta (Pico)",
+        funcao: targetShift.funcao || suggestedRole,
       });
+    } else {
+      // 2. Se não houver turno no horário de pico sugerido pela IA, cria o turno completo
+      const saved = await saveShift({
+        diaSemana: selectedShortDay,
+        horario: formattedHorario,
+        horarioInicio: inicio,
+        horarioFim: fim,
+        demanda: "Demanda alta (Pico)",
+        tipoDemanda: "alta",
+        vagaPendente: false,
+        funcao: suggestedRole,
+        intervalo: "15 min (lanche)",
+        observacoes: "Turno de reforço adicionado automaticamente pela IA para cobrir o pico.",
+        funcionarios: [targetCollaborator],
+      });
+
+      if (saved) {
+        affectedShiftId = saved.id || "";
+        setShifts((prev) => [
+          ...prev,
+          {
+            id: saved.id || String(Math.random()),
+            horario: saved.horario,
+            horarioInicio: saved.horarioInicio,
+            horarioFim: saved.horarioFim,
+            demanda: saved.demanda,
+            tipoDemanda: saved.tipoDemanda,
+            funcionarios: saved.funcionarios,
+            vagaPendente: saved.vagaPendente,
+            funcao: saved.funcao,
+            intervalo: saved.intervalo,
+            observacoes: saved.observacoes,
+          },
+        ]);
+      }
     }
-    showToast("success", "Sugestão da IA aplicada ao fechamento!");
+
+    // 3. Destaca visualmente o turno preenchido
+    if (affectedShiftId) {
+      setHighlightedShiftId(affectedShiftId);
+      setTimeout(() => setHighlightedShiftId(null), 3000);
+    }
+
+    // 4. Salva status de aplicado no backend
+    setIsAiApplied(true);
+    if (equipeInsight.id) {
+      void applyRecommendation(equipeInsight.id);
+    }
+
+    showToast(
+      "success",
+      `Sugestão da IA aplicada! Turno ${formattedHorario} alocado com ${targetCollaborator} (${suggestedRole}) e vaga preenchida.`,
+    );
   }
 
   // Cadastro de novo membro da equipe
@@ -344,11 +513,18 @@ export default function EquipePage() {
           onUpdateShift={handleUpdateShift}
           onAddShift={handleAddShift}
           onDeleteShift={handleDeleteShift}
+          highlightedShiftId={highlightedShiftId}
+          aiSuggestedShift={aiSuggestedShiftData}
         />
 
+        {/* Card no Molde Original (AlertPanel), alimentado com dados reais e botão 100% funcional */}
         <AlertPanel
-          onApplySuggestion={handleApplyAiSuggestion}
-          isApplied={isSuggestionApplied}
+          insight={equipeInsight}
+          loading={loadingInsight}
+          onApplySuggestion={handleAplicarSugestaoIA}
+          isApplied={isAiApplied}
+          suggestedHorario={`${suggestedTimeRange.inicio} às ${suggestedTimeRange.fim}`}
+          suggestedCollaborator={suggestedCollaborator}
         />
       </div>
 

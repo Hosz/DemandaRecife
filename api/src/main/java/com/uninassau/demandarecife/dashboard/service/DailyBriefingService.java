@@ -3,7 +3,11 @@ package com.uninassau.demandarecife.dashboard.service;
 import com.uninassau.demandarecife.alerts.dto.AlertResponse;
 import com.uninassau.demandarecife.alerts.service.AlertService;
 import com.uninassau.demandarecife.dashboard.dto.DailyBriefingResponseDTO;
+import com.uninassau.demandarecife.dashboard.dto.DailyBriefingResponseDTO.AiInsightDTO;
 import com.uninassau.demandarecife.dashboard.dto.DailyBriefingResponseDTO.CustomerFlowDTO;
+import com.uninassau.demandarecife.recommendations.dto.AiRecommendationDto;
+import com.uninassau.demandarecife.recommendations.service.RecommendationOrchestratorService;
+import org.springframework.beans.factory.ObjectProvider;
 import com.uninassau.demandarecife.dashboard.dto.DailyBriefingResponseDTO.MetricsDTO;
 import com.uninassau.demandarecife.dashboard.dto.DailyBriefingResponseDTO.OpportunityDTO;
 import com.uninassau.demandarecife.dashboard.dto.DailyBriefingResponseDTO.PrevisaoVenda;
@@ -56,6 +60,7 @@ public class DailyBriefingService {
     private final WeatherFinder weatherFinder;
     private final TenantFinder tenantFinder;
     private final SalesRepository salesRepository;
+    private final ObjectProvider<RecommendationOrchestratorService> orchestratorProvider;
 
     public record FlowCalculationResult(
             List<CustomerFlowDTO> flow,
@@ -100,6 +105,18 @@ public class DailyBriefingService {
                 "Monitore itens de alto giro no período da tarde para evitar rupturas de estoque no seu bairro."
         );
 
+        List<AiInsightDTO> aiInsights = secao("aiInsights", falhas, () -> {
+            if (orchestratorProvider != null) {
+                RecommendationOrchestratorService orchestrator = orchestratorProvider.getIfAvailable();
+                if (orchestrator != null) {
+                    List<AiRecommendationDto> recs = orchestrator.getDailyRecommendations(tenantId, hoje);
+                    return recs.stream().map(AiInsightDTO::fromRecommendation).toList();
+                }
+            }
+            return List.of();
+        });
+        AiInsightDTO aiInsight = aiInsights.isEmpty() ? null : aiInsights.get(0);
+
         return new DailyBriefingResponseDTO(
                 hoje,
                 alertas,
@@ -109,7 +126,9 @@ public class DailyBriefingService {
                 weather,
                 metrics,
                 flowResult.flow(),
-                opportunity
+                opportunity,
+                aiInsight,
+                aiInsights
         );
     }
 
@@ -132,7 +151,7 @@ public class DailyBriefingService {
         return new WeatherDTO("28°C", "Ensolarado", cidade + ", " + estado, dateStr);
     }
 
-    FlowCalculationResult calcularFluxoEPico(UUID tenantId, boolean usarBenchmarks) {
+    public FlowCalculationResult calcularFluxoEPico(UUID tenantId, boolean usarBenchmarks) {
         List<HourlySalesCount> hourlyCounts = List.of();
         try {
             if (salesRepository != null) {
@@ -220,6 +239,17 @@ public class DailyBriefingService {
                 "+2,4%",
                 flowResult.isRegionalEstimate()
         );
+    }
+
+    /** Uma seção de objeto que falha volta nula e é registrada em secoesComFalha (RNF03). */
+    private <T> T secaoObjeto(String nome, List<String> falhas, Supplier<T> fonte) {
+        try {
+            return fonte.get();
+        } catch (Exception ex) {
+            log.warn("Falha ao montar seção '{}' do briefing diário: {}", nome, ex.getMessage());
+            falhas.add(nome);
+            return null;
+        }
     }
 
     /** Uma seção que falha volta vazia e é registrada em secoesComFalha (RNF03). */

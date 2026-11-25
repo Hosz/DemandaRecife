@@ -2,6 +2,7 @@ package com.uninassau.demandarecife.sales.repository;
 
 import com.uninassau.demandarecife.sales.entity.SaleTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,6 +13,10 @@ import java.util.UUID;
 public interface SalesRepository extends JpaRepository<SaleTransaction, UUID> {
     List<SaleTransaction> findByTenantIdAndDataHoraVendaBetween(
             UUID tenantId, LocalDateTime inicio, LocalDateTime fim);
+
+    @Modifying
+    @Query("DELETE FROM SaleTransaction s WHERE s.tenantId = :tenantId AND s.productId = :productId")
+    void deleteByTenantIdAndProductId(@Param("tenantId") UUID tenantId, @Param("productId") UUID productId);
 
     @Query(value = """
             SELECT CAST(EXTRACT(HOUR FROM s.data_hora_venda) AS INTEGER) AS hora, COUNT(s.id) AS total

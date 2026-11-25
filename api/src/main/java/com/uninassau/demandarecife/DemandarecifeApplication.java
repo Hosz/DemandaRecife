@@ -19,31 +19,50 @@ public class DemandarecifeApplication {
 	}
 
 	private static void loadDotenv() {
-		File envFile = new File(".env");
-		if (!envFile.exists()) {
-			envFile = new File("../.env");
-		}
-		if (envFile.exists()) {
-			try (BufferedReader reader = new BufferedReader(new FileReader(envFile))) {
-				String line;
-				while ((line = reader.readLine()) != null) {
-					line = line.trim();
-					if (!line.isEmpty() && !line.startsWith("#") && line.contains("=")) {
-						int eqIdx = line.indexOf('=');
-						String key = line.substring(0, eqIdx).trim();
-						String value = line.substring(eqIdx + 1).trim();
-						if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
-							value = value.substring(1, value.length() - 1);
-						} else if (value.startsWith("'") && value.endsWith("'") && value.length() >= 2) {
-							value = value.substring(1, value.length() - 1);
-						}
-						if (System.getProperty(key) == null && System.getenv(key) == null) {
-							System.setProperty(key, value);
-						}
-					}
+		// Tenta múltiplos caminhos para encontrar o .env
+		File envFile = findEnvFile();
+		if (envFile == null) return;
+
+		try (BufferedReader reader = new BufferedReader(new FileReader(envFile))) {
+			String line;
+			while ((line = reader.readLine()) != null) {
+				line = line.trim();
+				if (line.isEmpty() || line.startsWith("#") || !line.contains("=")) continue;
+
+				int eqIdx = line.indexOf('=');
+				String key = line.substring(0, eqIdx).trim();
+				String value = line.substring(eqIdx + 1).trim();
+
+				// Remove aspas
+				if ((value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2)
+						|| (value.startsWith("'") && value.endsWith("'") && value.length() >= 2)) {
+					value = value.substring(1, value.length() - 1);
 				}
-			} catch (IOException ignored) {
+
+				if (value.isBlank()) continue;
+
+				// Só sobrescreve via setProperty se a variável de ambiente real
+				// estiver ausente OU estiver em branco (IntelliJ pode injetar strings vazias)
+				String existingEnv = System.getenv(key);
+				String existingProp = System.getProperty(key);
+				boolean envMissing = (existingEnv == null || existingEnv.isBlank());
+				boolean propMissing = (existingProp == null || existingProp.isBlank());
+
+				if (envMissing && propMissing) {
+					System.setProperty(key, value);
+					System.out.println("[dotenv] Loaded: " + key + " from " + envFile.getName());
+				}
 			}
+		} catch (IOException ignored) {
 		}
+	}
+
+	private static File findEnvFile() {
+		String[] candidates = {".env", "api/.env", "../.env", "../../.env"};
+		for (String candidate : candidates) {
+			File f = new File(candidate);
+			if (f.exists()) return f;
+		}
+		return null;
 	}
 }
